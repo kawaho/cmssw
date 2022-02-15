@@ -144,8 +144,6 @@ private:
   pair<vector<ElementWithIndex>, vector<tuple<int, int, float>>> processBlocks(
       const std::vector<reco::PFBlock>& pfBlocks);
 
-  void associateClusterToSimCluster(const vector<ElementWithIndex>& all_elements);
-
   void clearVariables();
 
   GlobalPoint getHitPosition(const DetId& id);
@@ -198,6 +196,14 @@ private:
   vector<int> simcluster_idx_trackingparticle_;
   vector<int> simcluster_nhits_;
   vector<std::map<uint64_t, double>> simcluster_detids_;
+
+  vector<float> caloparticle_eta_;
+  vector<float> caloparticle_phi_;
+  vector<float> caloparticle_pt_;
+  vector<float> caloparticle_energy_;
+  vector<float> caloparticle_simenergy_;
+  vector<int> caloparticle_pid_;
+  vector<int> caloparticle_idx_trackingparticle_;
 
   vector<float> simhit_frac_;
   vector<float> simhit_x_;
@@ -279,12 +285,9 @@ private:
   vector<int> pfcandidate_pdgid_;
 
   vector<pair<int, int>> trackingparticle_to_element;
-  vector<pair<int, int>> simcluster_to_element;
-  vector<float> simcluster_to_element_cmp;
+  vector<pair<int, int>> caloparticle_to_element;
+  vector<float> caloparticle_to_element_cmp;
   vector<pair<int, int>> element_to_candidate;
-
-  // and also the magnetic field
-  MagneticField const* aField_;
 
   edm::ESGetToken<CaloGeometry, CaloGeometryRecord> geometryToken_;
   edm::ESGetToken<HcalTopology, HcalRecNumberingRecord> topologyToken_;
@@ -293,7 +296,6 @@ private:
 
   CaloGeometry* geom;
   HcalTopology* hcal_topo;
-  const HcalDDDRecConstants* hcons;
 
   bool saveHits;
 };
@@ -353,6 +355,14 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("simcluster_idx_trackingparticle", &simcluster_idx_trackingparticle_);
   t_->Branch("simcluster_nhits", &simcluster_nhits_);
 
+  t_->Branch("caloparticle_eta", &caloparticle_eta_);
+  t_->Branch("caloparticle_phi", &caloparticle_phi_);
+  t_->Branch("caloparticle_pt", &caloparticle_pt_);
+  t_->Branch("caloparticle_energy", &caloparticle_energy_);
+  t_->Branch("caloparticle_simenergy", &caloparticle_simenergy_);
+  t_->Branch("caloparticle_pid", &caloparticle_pid_);
+  t_->Branch("caloparticle_idx_trackingparticle", &caloparticle_idx_trackingparticle_);
+
   if (saveHits) {
     t_->Branch("simhit_frac", &simhit_frac_);
     t_->Branch("simhit_x", &simhit_x_);
@@ -380,7 +390,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("simtrack_x", &simtrack_x_);
   t_->Branch("simtrack_y", &simtrack_y_);
   t_->Branch("simtrack_z", &simtrack_z_);
-  t_->Branch("simtrack_idx_simcluster_", &simtrack_idx_simcluster_);
+  t_->Branch("simtrack_idx_simcluster", &simtrack_idx_simcluster_);
   t_->Branch("simtrack_pid", &simtrack_pid_);
 
   t_->Branch("gen_eta", &gen_eta_);
@@ -438,8 +448,8 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
 
   //Links between reco, gen and PFCandidate objects
   t_->Branch("trackingparticle_to_element", &trackingparticle_to_element);
-  t_->Branch("simcluster_to_element", &simcluster_to_element);
-  t_->Branch("simcluster_to_element_cmp", &simcluster_to_element_cmp);
+  t_->Branch("caloparticle_to_element", &caloparticle_to_element);
+  t_->Branch("caloparticle_to_element_cmp", &caloparticle_to_element_cmp);
   t_->Branch("element_to_candidate", &element_to_candidate);
 }  // constructor
 
@@ -451,8 +461,8 @@ void PFAnalysis::clearVariables() {
   ev_event_ = 0;
 
   trackingparticle_to_element.clear();
-  simcluster_to_element.clear();
-  simcluster_to_element_cmp.clear();
+  caloparticle_to_element.clear();
+  caloparticle_to_element_cmp.clear();
   element_to_candidate.clear();
 
   trackingparticle_eta_.clear();
@@ -488,6 +498,14 @@ void PFAnalysis::clearVariables() {
   simcluster_pz_.clear();
   simcluster_idx_trackingparticle_.clear();
   simcluster_nhits_.clear();
+
+  caloparticle_pt_.clear();
+  caloparticle_eta_.clear();
+  caloparticle_phi_.clear();
+  caloparticle_energy_.clear();
+  caloparticle_simenergy_.clear();
+  caloparticle_pid_.clear();
+  caloparticle_idx_trackingparticle_.clear();
 
   if (saveHits) {
     simhit_frac_.clear();
@@ -680,88 +698,76 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   }
 
   processTrackingParticles(trackingParticles, trackingParticlesHandle);
-
-  int idx_simcluster = 0;
-  //Fill genparticles from calorimeter hits
-  for (unsigned long ncaloparticle = 0; ncaloparticle < caloParticles.size(); ncaloparticle++) {
+  
+  map<pair<int, int>, float> caloparticle_to_pfcluster;
+  map<uint64_t, vector<pair<int, float>>> simhit_to_caloparticle;
+  for (unsigned int ncaloparticle = 0; ncaloparticle < caloParticles.size(); ncaloparticle++) {
     const auto& cp = caloParticles.at(ncaloparticle);
     edm::RefToBase<CaloParticle> cpref(caloParticlesHandle, ncaloparticle);
 
-    int nhits = 0;
-    for (const auto& simcluster : cp.simClusters()) {
-      //create a map of detId->energy of all the rechits in all the clusters of this SimCluster
-      map<uint64_t, double> detid_energy;
+    caloparticle_pt_.push_back(cp.p4().pt());
+    caloparticle_eta_.push_back(cp.p4().eta());
+    caloparticle_phi_.push_back(cp.p4().phi());
+    caloparticle_energy_.push_back(cp.p4().energy());
+    caloparticle_simenergy_.push_back(cp.simEnergy());
+    caloparticle_pid_.push_back(cp.pdgId());
 
-      simcluster_nhits_.push_back(nhits);
-      simcluster_eta_.push_back(simcluster->p4().eta());
-      simcluster_phi_.push_back(simcluster->p4().phi());
-      simcluster_pt_.push_back(simcluster->p4().pt());
-      simcluster_energy_.push_back(simcluster->energy());
-      simcluster_pid_.push_back(simcluster->pdgId());
-      simcluster_bx_.push_back(simcluster->eventId().bunchCrossing());
-      simcluster_ev_.push_back(simcluster->eventId().event());
+    const auto& simtrack = cp.g4Tracks().at(0);
 
-      simcluster_px_.push_back(simcluster->p4().x());
-      simcluster_py_.push_back(simcluster->p4().y());
-      simcluster_pz_.push_back(simcluster->p4().z());
-
-      for (const auto& hf : simcluster->hits_and_fractions()) {
-        DetId id(hf.first);
-
-        if (id.det() == DetId::Hcal || id.det() == DetId::Ecal) {
-          const auto& pos = getHitPosition(id);
-          nhits += 1;
-
-          const float x = pos.x();
-          const float y = pos.y();
-          const float z = pos.z();
-          const float eta = pos.eta();
-          const float phi = pos.phi();
-
-          simhit_frac_.push_back(hf.second);
-          simhit_x_.push_back(x);
-          simhit_y_.push_back(y);
-          simhit_z_.push_back(z);
-          simhit_det_.push_back(id.det());
-          simhit_subdet_.push_back(id.subdetId());
-          simhit_eta_.push_back(eta);
-          simhit_phi_.push_back(phi);
-          simhit_idx_simcluster_.push_back(idx_simcluster);
-          simhit_detid_.push_back(id.rawId());
-          detid_energy[id.rawId()] += hf.second;
-        }
+    int caloparticle_to_trackingparticle = -1;
+    for (size_t itp = 0; itp < trackingParticles.size(); itp++) {
+      const auto& simtrack2 = trackingParticles.at(itp).g4Tracks().at(0);
+      //compare the two tracks, taking into account that both eventId and trackId need to be compared due to pileup
+      if (simtrack.eventId() == simtrack2.eventId() && simtrack.trackId() == simtrack2.trackId()) {
+        caloparticle_to_trackingparticle = itp;
+        //we are satisfied with the first match, in practice there should not be more
+        break;
       }
+    }  //trackingParticles
+    caloparticle_idx_trackingparticle_.push_back(caloparticle_to_trackingparticle);
+      
 
-      int simcluster_to_trackingparticle = -1;
-      for (const auto& simtrack : simcluster->g4Tracks()) {
-        simtrack_x_.push_back(simtrack.trackerSurfacePosition().x());
-        simtrack_y_.push_back(simtrack.trackerSurfacePosition().y());
-        simtrack_z_.push_back(simtrack.trackerSurfacePosition().z());
-        simtrack_idx_simcluster_.push_back(idx_simcluster);
-        simtrack_pid_.push_back(simtrack.type());
-
-        for (unsigned int itp = 0; itp < trackingParticles.size(); itp++) {
-          const auto& simtrack2 = trackingParticles.at(itp).g4Tracks().at(0);
-          //compare the two tracks, taking into account that both eventId and trackId need to be compared due to pileup
-          if (simtrack.eventId() == simtrack2.eventId() && simtrack.trackId() == simtrack2.trackId()) {
-            simcluster_to_trackingparticle = itp;
-            //we are satisfied with the first match, in practice there should not be more
-            break;
-          }
-        }  //trackingParticles
-      }  //simcluster tracks
-
-      simcluster_detids_.push_back(detid_energy);
-      simcluster_idx_trackingparticle_.push_back(simcluster_to_trackingparticle);
-
-      idx_simcluster += 1;
+    for (const auto& simcluster : cp.simClusters()) {
+      for (const auto& hf : simcluster->hits_and_fractions()) {
+        simhit_to_caloparticle[hf.first].push_back({ncaloparticle, hf.second});
+      }
     }  //simclusters
-  }  //caloParticles
+  } //caloParticles
 
-  associateClusterToSimCluster(all_elements);
+  
+  //fill pfcluster to rechit
+  map<int, vector<pair<uint64_t, float>>> pfcluster_to_rechit;
+  for (size_t ielem = 0; ielem < all_elements.size(); ielem++) {
+    const auto& elem = all_elements[ielem];
+    const auto& type = elem.orig.type();
+    if (type == reco::PFBlockElement::ECAL || type == reco::PFBlockElement::HCAL || type == reco::PFBlockElement::PS1 ||
+        type == reco::PFBlockElement::PS2 || type == reco::PFBlockElement::HO || type == reco::PFBlockElement::HFHAD ||
+        type == reco::PFBlockElement::HFEM) {
+      const auto& clref = elem.orig.clusterRef();
+      assert(clref.isNonnull());
+      const auto& cluster = *clref;
+
+      //all rechits and the energy fractions in this cluster
+      const vector<reco::PFRecHitFraction>& rechit_fracs = cluster.recHitFractions();
+      for (const auto& rh : rechit_fracs) {
+        const reco::PFRecHit pfrh = *rh.recHitRef();
+        pfcluster_to_rechit[ielem].push_back({pfrh.detId(), pfrh.energy()*rh.fraction()});
+      }  //rechit_fracs
+    } else if (type == reco::PFBlockElement::SC) {
+      const auto& clref = ((const reco::PFBlockElementSuperCluster*)&(elem.orig))->superClusterRef();
+      assert(clref.isNonnull());
+      const auto& cluster = *clref;
+
+      //all rechits and the energy fractions in this cluster
+      const auto& rechit_fracs = cluster.hitsAndFractions();
+      for (const auto& rh : rechit_fracs) {
+        pfcluster_to_rechit[ielem].push_back({rh.first.rawId(), rh.second});
+      }  //rechit_fracs
+    }
+  } //all_elements
 
   //fill elements
-  for (unsigned int ielem = 0; ielem < all_elements.size(); ielem++) {
+  for (size_t ielem = 0; ielem < all_elements.size(); ielem++) {
     const auto& elem = all_elements.at(ielem);
     const auto& orig = elem.orig;
     reco::PFBlockElement::Type type = orig.type();
@@ -895,6 +901,22 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
                type == reco::PFBlockElement::HO || type == reco::PFBlockElement::HFHAD ||
                type == reco::PFBlockElement::HFEM) {
       const auto& ref = ((const reco::PFBlockElementCluster*)&orig)->clusterRef();
+      const auto& found = pfcluster_to_rechit.find(ielem);
+      if (found != pfcluster_to_rechit.end()) {
+        for (const auto& rechit_frac : (*found).second) {
+          const auto& found_cp = simhit_to_caloparticle.find(rechit_frac.first);
+          if (found_cp != simhit_to_caloparticle.end()) {
+            for (const auto& simhit_frac : (*found_cp).second) {
+              //(icalo, ielem) += rechit_energy*rechit_fraction*simhit_fraction
+              const pair<size_t, size_t> key{simhit_frac.first, ielem};
+              if (caloparticle_to_pfcluster.find(key) == caloparticle_to_pfcluster.end()) {
+                caloparticle_to_pfcluster[key] = 0.0;
+              }
+              caloparticle_to_pfcluster[key] += rechit_frac.second*simhit_frac.second;
+            }
+          } 
+        } 
+      }
       if (ref.isNonnull()) {
         cluster_flags = ref->flags();
         eta = ref->eta();
@@ -920,18 +942,6 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
         pz = clref->position().z();
         energy = clref->energy();
         num_hits = clref->clustersSize();
-      }
-    }
-    vector<int> tps;
-    for (const auto& t : trackingparticle_to_element) {
-      if (t.second == (int)ielem) {
-        tps.push_back(t.first);
-      }
-    }
-    vector<int> scs;
-    for (const auto& t : simcluster_to_element) {
-      if (t.second == (int)ielem) {
-        scs.push_back(t.first);
       }
     }
 
@@ -960,6 +970,14 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     element_cluster_flags_.push_back(cluster_flags);
     element_gsf_electronseed_trkorecal_.push_back(gsf_electronseed_trkorecal);
     element_num_hits_.push_back(num_hits);
+  } //all_elements
+
+  //fill caloparticle_to_element
+  for (const auto& cp_to_pf : caloparticle_to_pfcluster) {
+    const auto& cp_pf = cp_to_pf.first;
+    const auto energy = cp_to_pf.second;
+    caloparticle_to_element.push_back(cp_pf);
+    caloparticle_to_element_cmp.push_back(energy);
   }
 
   //associate candidates to elements
@@ -1078,122 +1096,7 @@ pair<vector<ElementWithIndex>, vector<tuple<int, int, float>>> PFAnalysis::proce
 
 }  //processBlocks
 
-void PFAnalysis::associateClusterToSimCluster(const vector<ElementWithIndex>& all_elements) {
-  vector<map<uint64_t, double>> detids_elements;
-  map<uint64_t, double> rechits_energy_all;
-
-  int idx_element = 0;
-  for (const auto& elem : all_elements) {
-    map<uint64_t, double> detids;
-    const auto& type = elem.orig.type();
-
-    if (type == reco::PFBlockElement::ECAL || type == reco::PFBlockElement::HCAL || type == reco::PFBlockElement::PS1 ||
-        type == reco::PFBlockElement::PS2 || type == reco::PFBlockElement::HO || type == reco::PFBlockElement::HFHAD ||
-        type == reco::PFBlockElement::HFEM) {
-      const auto& clref = elem.orig.clusterRef();
-      assert(clref.isNonnull());
-      const auto& cluster = *clref;
-
-      //all rechits and the energy fractions in this cluster
-      const vector<reco::PFRecHitFraction>& rechit_fracs = cluster.recHitFractions();
-      for (const auto& rh : rechit_fracs) {
-        const reco::PFRecHit pfrh = *rh.recHitRef();
-        if (detids.find(pfrh.detId()) != detids.end()) {
-          continue;
-        }
-        detids[pfrh.detId()] += pfrh.energy() * rh.fraction();
-        const auto id = DetId(pfrh.detId());
-        float x = 0;
-        float y = 0;
-        float z = 0;
-        float eta = 0;
-        float phi = 0;
-
-        const auto& pos = getHitPosition(id);
-        x = pos.x();
-        y = pos.y();
-        z = pos.z();
-        eta = pos.eta();
-        phi = pos.phi();
-
-        rechit_x_.push_back(x);
-        rechit_y_.push_back(y);
-        rechit_z_.push_back(z);
-        rechit_det_.push_back(id.det());
-        rechit_subdet_.push_back(id.subdetId());
-        rechit_eta_.push_back(eta);
-        rechit_phi_.push_back(phi);
-        rechit_e_.push_back(pfrh.energy() * rh.fraction());
-        rechit_idx_element_.push_back(idx_element);
-        rechit_detid_.push_back(id.rawId());
-        rechits_energy_all[id.rawId()] += pfrh.energy() * rh.fraction();
-      }  //rechit_fracs
-    } else if (type == reco::PFBlockElement::SC) {
-      const auto& clref = ((const reco::PFBlockElementSuperCluster*)&(elem.orig))->superClusterRef();
-      assert(clref.isNonnull());
-      const auto& cluster = *clref;
-
-      //all rechits and the energy fractions in this cluster
-      const auto& rechit_fracs = cluster.hitsAndFractions();
-      for (const auto& rh : rechit_fracs) {
-        if (detids.find(rh.first.rawId()) != detids.end()) {
-          continue;
-        }
-        detids[rh.first.rawId()] += cluster.energy() * rh.second;
-        const auto id = rh.first;
-        float x = 0;
-        float y = 0;
-        float z = 0;
-        float eta = 0;
-        float phi = 0;
-
-        const auto& pos = getHitPosition(id);
-        x = pos.x();
-        y = pos.y();
-        z = pos.z();
-        eta = pos.eta();
-        phi = pos.phi();
-
-        rechit_x_.push_back(x);
-        rechit_y_.push_back(y);
-        rechit_z_.push_back(z);
-        rechit_det_.push_back(id.det());
-        rechit_subdet_.push_back(id.subdetId());
-        rechit_eta_.push_back(eta);
-        rechit_phi_.push_back(phi);
-        rechit_e_.push_back(rh.second);
-        rechit_idx_element_.push_back(idx_element);
-        rechit_detid_.push_back(id.rawId());
-        rechits_energy_all[id.rawId()] += cluster.energy() * rh.second;
-      }  //rechit_fracs
-    }
-    detids_elements.push_back(detids);
-    idx_element += 1;
-  }  //all_elements
-
-  //associate elements (reco clusters) to simclusters
-  int ielement = 0;
-  for (const auto& detids : detids_elements) {
-    int isimcluster = 0;
-    if (!detids.empty()) {
-      for (const auto& simcluster_detids : simcluster_detids_) {
-        //get the energy of the simcluster hits that matches detids of the rechits
-        double cmp = detid_compare(detids, simcluster_detids);
-        if (cmp > 0) {
-          simcluster_to_element.push_back(make_pair(isimcluster, ielement));
-          simcluster_to_element_cmp.push_back((float)cmp);
-        }
-        isimcluster += 1;
-      }
-    }  //element had rechits
-    ielement += 1;
-  }  //rechit clusters
-}
-
-void PFAnalysis::beginRun(edm::Run const& iEvent, edm::EventSetup const& es) {
-  hcons = &es.getData(hcalDDDrecToken_);
-  aField_ = &es.getData(magFieldToken_);
-}
+void PFAnalysis::beginRun(edm::Run const& iEvent, edm::EventSetup const& es) {}
 
 void PFAnalysis::endRun(edm::Run const& iEvent, edm::EventSetup const&) {}
 
