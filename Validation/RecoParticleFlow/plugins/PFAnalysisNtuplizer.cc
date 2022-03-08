@@ -88,14 +88,14 @@ vector<int> find_element_ref(const vector<ElementWithIndex>& vec, const edm::Ref
         }
       }
     } else if (elem.orig.type() == reco::PFBlockElement::GSF) {
-      const auto& ref = ((const reco::PFBlockElementGsfTrack*)&elem.orig)->clusterRef();
+      const auto& ref = ((const reco::PFBlockElementGsfTrack*)&elem.orig)->GsftrackRef();
       if (ref.isNonnull()) {
         if (ref.key() == r.key()) {
           ret.push_back(i);
         }
       }
     } else if (elem.orig.type() == reco::PFBlockElement::BREM) {
-      const auto& ref = ((const reco::PFBlockElementBrem*)&elem.orig)->clusterRef();
+      const auto& ref = ((const reco::PFBlockElementBrem*)&elem.orig)->GsftrackRef();
       if (ref.isNonnull()) {
         if (ref.key() == r.key()) {
           ret.push_back(i);
