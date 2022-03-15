@@ -15,7 +15,6 @@
 #include "DataFormats/GsfTrackReco/interface/GsfTrack.h"
 #include "DataFormats/HcalRecHit/interface/HFRecHit.h"
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
-#include "Geometry/HcalCommonData/interface/HcalHitRelabeller.h"
 #include "DataFormats/HcalDetId/interface/HcalDetId.h"
 #include "DataFormats/EcalDetId/interface/EcalSubdetector.h"
 #include "DataFormats/ParticleFlowReco/interface/PFCluster.h"
@@ -26,7 +25,6 @@
 #include "DataFormats/ParticleFlowReco/interface/PFBlockElementTrack.h"
 #include "DataFormats/ParticleFlowReco/interface/PFBlockElementBrem.h"
 #include "DataFormats/ParticleFlowReco/interface/PFBlockElementCluster.h"
-#include "Geometry/HcalTowerAlgo/interface/HcalGeometry.h"
 #include "SimDataFormats/CaloAnalysis/interface/CaloParticle.h"
 #include "SimDataFormats/CaloAnalysis/interface/SimCluster.h"
 #include "SimDataFormats/GeneratorProducts/interface/HepMCProduct.h"
@@ -40,17 +38,8 @@
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/DetId/interface/DetId.h"
 
-#include "DataFormats/GeometrySurface/interface/PlaneBuilder.h"
-#include "Geometry/CaloGeometry/interface/CaloCellGeometry.h"
-#include "Geometry/CaloGeometry/interface/CaloGeometry.h"
-#include "Geometry/CaloGeometry/interface/CaloSubdetectorGeometry.h"
-#include "Geometry/Records/interface/CaloGeometryRecord.h"
 
-#include "CommonTools/BaseParticlePropagator/interface/BaseParticlePropagator.h"
 #include "Math/Transform3D.h"
-#include "MagneticField/Engine/interface/MagneticField.h"
-#include "MagneticField/Records/interface/IdealMagneticFieldRecord.h"
-#include "MagneticField/VolumeGeometry/interface/MagVolumeOutsideValidity.h"
 #include "RecoParticleFlow/PFProducer/interface/MLPFModel.h"
 
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
@@ -146,7 +135,6 @@ private:
 
   void clearVariables();
 
-  GlobalPoint getHitPosition(const DetId& id);
   // ----------member data ---------------------------
 
   edm::EDGetTokenT<std::vector<reco::GenParticle>> genParticles_;
@@ -156,6 +144,7 @@ private:
   edm::EDGetTokenT<std::vector<reco::PFBlock>> pfBlocks_;
   edm::EDGetTokenT<std::vector<reco::PFCandidate>> pfCandidates_;
   edm::EDGetTokenT<reco::RecoToSimCollection> tracks_recotosim_;
+  edm::EDGetTokenT<edm::View<reco::GsfElectron>> gsfElectrons_;
 
   TTree* t_;
 
@@ -269,6 +258,11 @@ private:
   vector<float> element_muon_type_;
   vector<float> element_cluster_flags_;
   vector<float> element_gsf_electronseed_trkorecal_;
+  vector<float> element_gsf_electronseed_dnn1_;
+  vector<float> element_gsf_electronseed_dnn2_;
+  vector<float> element_gsf_electronseed_dnn3_;
+  vector<float> element_gsf_electronseed_dnn4_;
+  vector<float> element_gsf_electronseed_dnn5_;
   vector<float> element_num_hits_;
 
   vector<int> element_distance_i_;
@@ -289,14 +283,6 @@ private:
   vector<float> caloparticle_to_element_cmp;
   vector<pair<int, int>> element_to_candidate;
 
-  edm::ESGetToken<CaloGeometry, CaloGeometryRecord> geometryToken_;
-  edm::ESGetToken<HcalTopology, HcalRecNumberingRecord> topologyToken_;
-  edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magFieldToken_;
-  edm::ESGetToken<HcalDDDRecConstants, HcalRecNumberingRecord> hcalDDDrecToken_;
-
-  CaloGeometry* geom;
-  HcalTopology* hcal_topo;
-
   bool saveHits;
 };
 
@@ -311,11 +297,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   pfCandidates_ = consumes<std::vector<reco::PFCandidate>>(edm::InputTag("particleFlow"));
   tracks_ = consumes<edm::View<reco::Track>>(edm::InputTag("generalTracks"));
   saveHits = iConfig.getUntrackedParameter<bool>("saveHits", false);
-
-  geometryToken_ = esConsumes<CaloGeometry, CaloGeometryRecord>(edm::ESInputTag{});
-  topologyToken_ = esConsumes<HcalTopology, HcalRecNumberingRecord>(edm::ESInputTag{});
-  magFieldToken_ = esConsumes<edm::Transition::BeginRun>();
-  hcalDDDrecToken_ = esConsumes<edm::Transition::BeginRun>();
+  gsfElectrons_ = consumes<edm::View<reco::GsfElectron>>(edm::InputTag("gedGsfElectrons"));
 
   usesResource(TFileService::kSharedResource);
   edm::Service<TFileService> fs;
@@ -430,6 +412,11 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("element_muon_type", &element_muon_type_);
   t_->Branch("element_cluster_flags", &element_cluster_flags_);
   t_->Branch("element_gsf_electronseed_trkorecal", &element_gsf_electronseed_trkorecal_);
+  t_->Branch("element_gsf_electronseed_dnn1", &element_gsf_electronseed_dnn1_);
+  t_->Branch("element_gsf_electronseed_dnn2", &element_gsf_electronseed_dnn2_);
+  t_->Branch("element_gsf_electronseed_dnn3", &element_gsf_electronseed_dnn3_);
+  t_->Branch("element_gsf_electronseed_dnn4", &element_gsf_electronseed_dnn4_);
+  t_->Branch("element_gsf_electronseed_dnn5", &element_gsf_electronseed_dnn5_);
   t_->Branch("element_num_hits", &element_num_hits_);
 
   //Distance matrix between PF elements
@@ -573,6 +560,11 @@ void PFAnalysis::clearVariables() {
   element_muon_type_.clear();
   element_cluster_flags_.clear();
   element_gsf_electronseed_trkorecal_.clear();
+  element_gsf_electronseed_dnn1_.clear();
+  element_gsf_electronseed_dnn2_.clear();
+  element_gsf_electronseed_dnn3_.clear();
+  element_gsf_electronseed_dnn4_.clear();
+  element_gsf_electronseed_dnn5_.clear();
   element_num_hits_.clear();
 
   element_distance_i_.clear();
@@ -590,31 +582,8 @@ void PFAnalysis::clearVariables() {
 
 }  //clearVariables
 
-GlobalPoint PFAnalysis::getHitPosition(const DetId& id) {
-  GlobalPoint ret;
-
-  bool present = false;
-  if (((id.det() == DetId::Ecal &&
-        (id.subdetId() == EcalBarrel || id.subdetId() == EcalEndcap || id.subdetId() == EcalPreshower)) ||
-       (id.det() == DetId::Hcal && (id.subdetId() == HcalBarrel || id.subdetId() == HcalEndcap ||
-                                    id.subdetId() == HcalForward || id.subdetId() == HcalOuter)))) {
-    const CaloSubdetectorGeometry* geom_sd(geom->getSubdetectorGeometry(id.det(), id.subdetId()));
-    present = geom_sd->present(id);
-    if (present) {
-      const auto& cell = geom_sd->getGeometry(id);
-      ret = GlobalPoint(cell->getPosition());
-    }
-  }
-  return ret;
-}
-
 void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
   clearVariables();
-
-  auto& pG = iSetup.getData(geometryToken_);
-  geom = (CaloGeometry*)&pG;
-  auto& pT = iSetup.getData(topologyToken_);
-  hcal_topo = (HcalTopology*)&pT;
 
   //Simulated tracks, cleaned up by TrackingTruthAccumulator
   edm::Handle<edm::View<TrackingParticle>> trackingParticlesHandle;
@@ -633,6 +602,10 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   edm::Handle<edm::View<reco::Track>> trackHandle;
   iEvent.getByToken(tracks_, trackHandle);
   const edm::View<reco::Track>& tracks = *trackHandle;
+
+  edm::Handle<edm::View<reco::GsfElectron>> gsfElectronHandle;
+  iEvent.getByToken(gsfElectrons_, gsfElectronHandle);
+  const edm::View<reco::GsfElectron>& gsfElectrons = *gsfElectronHandle;
 
   edm::Handle<std::vector<reco::GenParticle>> genParticlesHandle;
   iEvent.getByToken(genParticles_, genParticlesHandle);
@@ -795,6 +768,11 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     float muon_type = 0.0;
     float cluster_flags = 0.0;
     float gsf_electronseed_trkorecal = 0.0;
+    float gsf_electronseed_dnn1 = 0.0;
+    float gsf_electronseed_dnn2 = 0.0;
+    float gsf_electronseed_dnn3 = 0.0;
+    float gsf_electronseed_dnn4 = 0.0;
+    float gsf_electronseed_dnn5 = 0.0;
     float num_hits = 0.0;
 
     if (type == reco::PFBlockElement::TRACK) {
@@ -884,6 +862,18 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
       const auto& ref = orig2->GsftrackRef();
 
+      //Find the GSF electron that corresponds to this GSF track
+      for (const auto& gsfEle : gsfElectrons) {
+        if (ref == gsfEle.gsfTrack()) {
+          gsf_electronseed_dnn1 = gsfEle.dnn_signal_Isolated();
+          gsf_electronseed_dnn2 = gsfEle.dnn_signal_nonIsolated();
+          gsf_electronseed_dnn3 = gsfEle.dnn_bkg_nonIsolated();
+          gsf_electronseed_dnn4 = gsfEle.dnn_bkg_Tau();
+          gsf_electronseed_dnn5 = gsfEle.dnn_bkg_Photon();
+          break;
+        }
+      }
+
       const auto& gsfextraref = ref->extra();
       if (gsfextraref.isAvailable() && gsfextraref->seedRef().isAvailable()) {
         reco::ElectronSeedRef seedref = gsfextraref->seedRef().castTo<reco::ElectronSeedRef>();
@@ -934,6 +924,17 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     } else if (type == reco::PFBlockElement::SC) {
       const auto& clref = ((const reco::PFBlockElementSuperCluster*)&orig)->superClusterRef();
       if (clref.isNonnull()) {
+        //Find the GSF electron that corresponds to this SC
+        for (const auto& gsfEle : gsfElectrons) {
+          if (clref == gsfEle.superCluster()) {
+            gsf_electronseed_dnn1 = gsfEle.dnn_signal_Isolated();
+            gsf_electronseed_dnn2 = gsfEle.dnn_signal_nonIsolated();
+            gsf_electronseed_dnn3 = gsfEle.dnn_bkg_nonIsolated();
+            gsf_electronseed_dnn4 = gsfEle.dnn_bkg_Tau();
+            gsf_electronseed_dnn5 = gsfEle.dnn_bkg_Photon();
+            break;
+          }
+        }
         cluster_flags = clref->flags();
         eta = clref->eta();
         phi = clref->phi();
@@ -969,6 +970,11 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     element_muon_type_.push_back(muon_type);
     element_cluster_flags_.push_back(cluster_flags);
     element_gsf_electronseed_trkorecal_.push_back(gsf_electronseed_trkorecal);
+    element_gsf_electronseed_dnn1_.push_back(gsf_electronseed_dnn1);
+    element_gsf_electronseed_dnn2_.push_back(gsf_electronseed_dnn2);
+    element_gsf_electronseed_dnn3_.push_back(gsf_electronseed_dnn3);
+    element_gsf_electronseed_dnn4_.push_back(gsf_electronseed_dnn4);
+    element_gsf_electronseed_dnn5_.push_back(gsf_electronseed_dnn5);
     element_num_hits_.push_back(num_hits);
   } //all_elements
 
