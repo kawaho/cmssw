@@ -31,10 +31,9 @@ def customize_step2(process):
         )
     )
     process.caloParticles.doHGCAL = False
-    process.caloParticles.allowDifferentSimHitProcesses = True
     process.mix.digitizers.caloParticles = process.caloParticles
     process.mix.digitizers.mergedtruth.ignoreTracksOutsideVolume = True
-    process.mix.digitizers.mergedtruth.allowDifferentSimHitProcesses = True
+    process.mix.digitizers.mergedtruth.allowDifferentSimHitProcesses = False
     process.mix.digitizers.mergedtruth.select.signalOnlyTP = False
 
     process.FEVTDEBUGHLToutput.outputCommands.append('keep *_simSiStripDigis_*_*')

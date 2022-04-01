@@ -191,6 +191,8 @@ private:
   vector<float> caloparticle_pt_;
   vector<float> caloparticle_energy_;
   vector<float> caloparticle_simenergy_;
+  vector<float> caloparticle_bx_;
+  vector<float> caloparticle_ev_;
   vector<int> caloparticle_pid_;
   vector<int> caloparticle_idx_trackingparticle_;
 
@@ -235,15 +237,19 @@ private:
   vector<vector<int>> gen_daughters_;
 
   vector<float> element_pt_;
+  vector<float> element_pterror_;
   vector<float> element_px_;
   vector<float> element_py_;
   vector<float> element_pz_;
   vector<float> element_deltap_;
   vector<float> element_sigmadeltap_;
   vector<float> element_eta_;
+  vector<float> element_etaerror_;
   vector<float> element_phi_;
+  vector<float> element_phierror_;
   vector<float> element_energy_;
   vector<float> element_corr_energy_;
+  vector<float> element_corr_energy_err_;
   vector<float> element_eta_ecal_;
   vector<float> element_phi_ecal_;
   vector<float> element_eta_hcal_;
@@ -264,6 +270,13 @@ private:
   vector<float> element_gsf_electronseed_dnn4_;
   vector<float> element_gsf_electronseed_dnn5_;
   vector<float> element_num_hits_;
+  vector<float> element_lambda_;
+  vector<float> element_lambdaerror_;
+  vector<float> element_theta_;
+  vector<float> element_thetaerror_;
+  vector<float> element_vx_;
+  vector<float> element_vy_;
+  vector<float> element_vz_;
 
   vector<int> element_distance_i_;
   vector<int> element_distance_j_;
@@ -342,6 +355,8 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("caloparticle_pt", &caloparticle_pt_);
   t_->Branch("caloparticle_energy", &caloparticle_energy_);
   t_->Branch("caloparticle_simenergy", &caloparticle_simenergy_);
+  t_->Branch("caloparticle_bx", &caloparticle_bx_);
+  t_->Branch("caloparticle_ev", &caloparticle_ev_);
   t_->Branch("caloparticle_pid", &caloparticle_pid_);
   t_->Branch("caloparticle_idx_trackingparticle", &caloparticle_idx_trackingparticle_);
 
@@ -389,15 +404,19 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
 
   //PF Elements
   t_->Branch("element_pt", &element_pt_);
+  t_->Branch("element_pterror", &element_pterror_);
   t_->Branch("element_px", &element_px_);
   t_->Branch("element_py", &element_py_);
   t_->Branch("element_pz", &element_pz_);
   t_->Branch("element_deltap", &element_deltap_);
   t_->Branch("element_sigmadeltap", &element_sigmadeltap_);
   t_->Branch("element_eta", &element_eta_);
+  t_->Branch("element_etaerror", &element_etaerror_);
   t_->Branch("element_phi", &element_phi_);
+  t_->Branch("element_phierror", &element_phierror_);
   t_->Branch("element_energy", &element_energy_);
   t_->Branch("element_corr_energy", &element_corr_energy_);
+  t_->Branch("element_corr_energy_err", &element_corr_energy_err_);
   t_->Branch("element_eta_ecal", &element_eta_ecal_);
   t_->Branch("element_phi_ecal", &element_phi_ecal_);
   t_->Branch("element_eta_hcal", &element_eta_hcal_);
@@ -418,6 +437,13 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("element_gsf_electronseed_dnn4", &element_gsf_electronseed_dnn4_);
   t_->Branch("element_gsf_electronseed_dnn5", &element_gsf_electronseed_dnn5_);
   t_->Branch("element_num_hits", &element_num_hits_);
+  t_->Branch("element_lambda", &element_lambda_);
+  t_->Branch("element_lambdaerror", &element_lambdaerror_);
+  t_->Branch("element_theta", &element_theta_);
+  t_->Branch("element_thetaerror", &element_thetaerror_);
+  t_->Branch("element_vx", &element_vx_);
+  t_->Branch("element_vy", &element_vy_);
+  t_->Branch("element_vz", &element_vz_);
 
   //Distance matrix between PF elements
   t_->Branch("element_distance_i", &element_distance_i_);
@@ -491,6 +517,8 @@ void PFAnalysis::clearVariables() {
   caloparticle_phi_.clear();
   caloparticle_energy_.clear();
   caloparticle_simenergy_.clear();
+  caloparticle_bx_.clear();
+  caloparticle_ev_.clear();
   caloparticle_pid_.clear();
   caloparticle_idx_trackingparticle_.clear();
 
@@ -537,15 +565,19 @@ void PFAnalysis::clearVariables() {
   gen_daughters_.clear();
 
   element_pt_.clear();
+  element_pterror_.clear();
   element_px_.clear();
   element_py_.clear();
   element_pz_.clear();
   element_deltap_.clear();
   element_sigmadeltap_.clear();
   element_eta_.clear();
+  element_etaerror_.clear();
   element_phi_.clear();
+  element_phierror_.clear();
   element_energy_.clear();
   element_corr_energy_.clear();
+  element_corr_energy_err_.clear();
   element_eta_ecal_.clear();
   element_phi_ecal_.clear();
   element_eta_hcal_.clear();
@@ -566,6 +598,13 @@ void PFAnalysis::clearVariables() {
   element_gsf_electronseed_dnn4_.clear();
   element_gsf_electronseed_dnn5_.clear();
   element_num_hits_.clear();
+  element_lambda_.clear();
+  element_lambdaerror_.clear();
+  element_theta_.clear();
+  element_thetaerror_.clear();
+  element_vx_.clear();
+  element_vy_.clear();
+  element_vz_.clear();
 
   element_distance_i_.clear();
   element_distance_j_.clear();
@@ -683,6 +722,9 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     caloparticle_phi_.push_back(cp.p4().phi());
     caloparticle_energy_.push_back(cp.p4().energy());
     caloparticle_simenergy_.push_back(cp.simEnergy());
+
+    caloparticle_ev_.push_back(cp.eventId().event());
+    caloparticle_bx_.push_back(cp.eventId().bunchCrossing());
     caloparticle_pid_.push_back(cp.pdgId());
 
     const auto& simtrack = cp.g4Tracks().at(0);
@@ -746,15 +788,26 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     reco::PFBlockElement::Type type = orig.type();
 
     float pt = 0.0;
+    float ptError = 0.0;
     float deltap = 0.0;
     float sigmadeltap = 0.0;
     float px = 0.0;
     float py = 0.0;
     float pz = 0.0;
     float eta = 0.0;
+    float etaError = 0.0;
     float phi = 0.0;
+    float phiError = 0.0;
+    float lambda = 0.0;
+    float lambdaError = 0.0;
+    float theta = 0.0;
+    float thetaError = 0.0;
     float energy = 0.0;
+    float vx = 0.0;
+    float vy = 0.0;
+    float vz = 0.0;
     float corr_energy = 0.0;
+    float corr_energy_err = 0.0;
     float trajpoint = 0.0;
     float eta_ecal = 0.0;
     float phi_ecal = 0.0;
@@ -791,14 +844,24 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       }
       const auto& ref = ((const reco::PFBlockElementTrack*)&orig)->trackRef();
       pt = ref->pt();
+      ptError = ref->ptError();
       px = ref->px();
       py = ref->py();
       pz = ref->pz();
       eta = ref->eta();
+      etaError = ref->etaError();
       phi = ref->phi();
+      phiError = ref->phiError();
       energy = ref->p();
       charge = ref->charge();
       num_hits = ref->recHitsSize();
+      lambda = ref->lambda();
+      lambdaError = ref->lambdaError();
+      theta = ref->theta();
+      thetaError = ref->thetaError();
+      vx = ref->vx();
+      vy = ref->vy();
+      vz = ref->vz();
 
       reco::MuonRef muonRef = orig.muonRef();
       if (muonRef.isNonnull()) {
@@ -842,25 +905,39 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     } else if (type == reco::PFBlockElement::GSF) {
       //requires to keep GsfPFRecTracks
       const auto* orig2 = (const reco::PFBlockElementGsfTrack*)&orig;
+      const auto& ref = orig2->GsftrackRef();
+
+      pt = ref->ptMode();
+      ptError = ref->ptModeError();
+      px = ref->pxMode();
+      py = ref->pyMode();
+      pz = ref->pzMode();
+      eta = ref->etaMode();
+      etaError = ref->etaModeError();
+      phi = ref->phiMode();
+      phiError = ref->phiModeError();
+      energy = ref->pMode();
+
       const auto& vec = orig2->Pin();
-      pt = vec.pt();
-      px = vec.px();
-      py = vec.py();
-      pz = vec.pz();
-      eta = vec.eta();
-      phi = vec.phi();
-      energy = vec.energy();
+      eta_ecal = vec.eta();
+      phi_ecal = vec.phi();
 
       const auto& vec2 = orig2->Pout();
-      eta_ecal = vec2.eta();
-      phi_ecal = vec2.phi();
+      eta_hcal = vec2.eta();
+      phi_hcal = vec2.phi();
 
       if (!orig2->GsftrackRefPF().isNull()) {
         charge = orig2->GsftrackRefPF()->charge();
         num_hits = orig2->GsftrackRefPF()->PFRecBrem().size();
       }
 
-      const auto& ref = orig2->GsftrackRef();
+      lambda = ref->lambdaMode();
+      lambdaError = ref->lambdaModeError();
+      theta = ref->thetaMode();
+      thetaError = ref->thetaModeError();
+      vx = ref->vx();
+      vy = ref->vy();
+      vz = ref->vz();
 
       //Find the GSF electron that corresponds to this GSF track
       for (const auto& gsfEle : gsfElectrons) {
@@ -917,9 +994,13 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
         pz = ref->position().z();
         energy = ref->energy();
         corr_energy = ref->correctedEnergy();
+        corr_energy_err = ref->correctedEnergyUncertainty();
         layer = ref->layer();
         depth = ref->depth();
         num_hits = ref->recHitFractions().size();
+        vx = ref->vx();
+        vy = ref->vy();
+        vz = ref->vz();
       }
     } else if (type == reco::PFBlockElement::SC) {
       const auto& clref = ((const reco::PFBlockElementSuperCluster*)&orig)->superClusterRef();
@@ -942,20 +1023,27 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
         py = clref->position().y();
         pz = clref->position().z();
         energy = clref->energy();
+        corr_energy = clref->preshowerEnergy();
         num_hits = clref->clustersSize();
+        etaError = clref->etaWidth();
+        phiError = clref->phiWidth();
       }
     }
 
     element_pt_.push_back(pt);
+    element_pterror_.push_back(ptError);
     element_px_.push_back(px);
     element_py_.push_back(py);
     element_pz_.push_back(pz);
     element_deltap_.push_back(deltap);
     element_sigmadeltap_.push_back(sigmadeltap);
     element_eta_.push_back(eta);
+    element_etaerror_.push_back(etaError);
     element_phi_.push_back(phi);
+    element_phierror_.push_back(phiError);
     element_energy_.push_back(energy);
     element_corr_energy_.push_back(corr_energy);
+    element_corr_energy_err_.push_back(corr_energy_err);
     element_eta_ecal_.push_back(eta_ecal);
     element_phi_ecal_.push_back(phi_ecal);
     element_eta_hcal_.push_back(eta_hcal);
@@ -976,6 +1064,13 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     element_gsf_electronseed_dnn4_.push_back(gsf_electronseed_dnn4);
     element_gsf_electronseed_dnn5_.push_back(gsf_electronseed_dnn5);
     element_num_hits_.push_back(num_hits);
+    element_lambda_.push_back(lambda);
+    element_lambdaerror_.push_back(lambdaError);
+    element_theta_.push_back(theta);
+    element_thetaerror_.push_back(thetaError);
+    element_vx_.push_back(vx);
+    element_vy_.push_back(vy);
+    element_vz_.push_back(vz);
   } //all_elements
 
   //fill caloparticle_to_element
