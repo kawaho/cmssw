@@ -18,6 +18,8 @@ process.load("SimTracker.TrackerHitAssociation.tpClusterProducer_cfi")
 process.load("SimTracker.TrackAssociatorProducers.quickTrackAssociatorByHits_cfi")
 process.load("SimTracker.TrackAssociatorProducers.trackAssociatorByHits_cfi")
 process.load("SimTracker.TrackAssociation.trackingParticleRecoTrackAsssociation_cfi")
+  
+process.trackingParticleGsfTrackAssociation = process.trackingParticleRecoTrackAsssociation.clone(label_tr="electronGsfTracks")
 
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, "auto:phase1_2022_realistic")
@@ -41,4 +43,5 @@ process.p = cms.Path(
   process.tpClusterProducer*
   process.quickTrackAssociatorByHits*
   process.trackingParticleRecoTrackAsssociation*
+  process.trackingParticleGsfTrackAssociation*
   process.ana)
