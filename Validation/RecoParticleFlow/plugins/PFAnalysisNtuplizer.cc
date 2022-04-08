@@ -141,9 +141,11 @@ private:
   edm::EDGetTokenT<edm::View<TrackingParticle>> trackingParticles_;
   edm::EDGetTokenT<edm::View<CaloParticle>> caloParticles_;
   edm::EDGetTokenT<edm::View<reco::Track>> tracks_;
+  edm::EDGetTokenT<edm::View<reco::Track>> gsftracks_;
   edm::EDGetTokenT<std::vector<reco::PFBlock>> pfBlocks_;
   edm::EDGetTokenT<std::vector<reco::PFCandidate>> pfCandidates_;
   edm::EDGetTokenT<reco::RecoToSimCollection> tracks_recotosim_;
+  edm::EDGetTokenT<reco::RecoToSimCollection> gsf_recotosim_;
   edm::EDGetTokenT<edm::View<reco::GsfElectron>> gsfElectrons_;
 
   TTree* t_;
@@ -292,6 +294,7 @@ private:
   vector<int> pfcandidate_pdgid_;
 
   vector<pair<int, int>> trackingparticle_to_element;
+  vector<float> trackingparticle_to_element_cmp;
   vector<pair<int, int>> caloparticle_to_element;
   vector<float> caloparticle_to_element_cmp;
   vector<pair<int, int>> element_to_candidate;
@@ -303,12 +306,14 @@ PFAnalysis::PFAnalysis() { ; }
 
 PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   tracks_recotosim_ = consumes<reco::RecoToSimCollection>(edm::InputTag("trackingParticleRecoTrackAsssociation"));
+  gsf_recotosim_ = consumes<reco::RecoToSimCollection>(edm::InputTag("trackingParticleGsfTrackAssociation"));
   trackingParticles_ = consumes<edm::View<TrackingParticle>>(edm::InputTag("mix", "MergedTrackTruth"));
   caloParticles_ = consumes<edm::View<CaloParticle>>(edm::InputTag("mix", "MergedCaloTruth"));
   genParticles_ = consumes<std::vector<reco::GenParticle>>(edm::InputTag("genParticles"));
   pfBlocks_ = consumes<std::vector<reco::PFBlock>>(edm::InputTag("particleFlowBlock"));
   pfCandidates_ = consumes<std::vector<reco::PFCandidate>>(edm::InputTag("particleFlow"));
   tracks_ = consumes<edm::View<reco::Track>>(edm::InputTag("generalTracks"));
+  gsftracks_ = consumes<edm::View<reco::Track>>(edm::InputTag("electronGsfTracks"));
   saveHits = iConfig.getUntrackedParameter<bool>("saveHits", false);
   gsfElectrons_ = consumes<edm::View<reco::GsfElectron>>(edm::InputTag("gedGsfElectrons"));
 
@@ -461,6 +466,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
 
   //Links between reco, gen and PFCandidate objects
   t_->Branch("trackingparticle_to_element", &trackingparticle_to_element);
+  t_->Branch("trackingparticle_to_element_cmp", &trackingparticle_to_element_cmp);
   t_->Branch("caloparticle_to_element", &caloparticle_to_element);
   t_->Branch("caloparticle_to_element_cmp", &caloparticle_to_element_cmp);
   t_->Branch("element_to_candidate", &element_to_candidate);
@@ -474,6 +480,7 @@ void PFAnalysis::clearVariables() {
   ev_event_ = 0;
 
   trackingparticle_to_element.clear();
+  trackingparticle_to_element_cmp.clear();
   caloparticle_to_element.clear();
   caloparticle_to_element_cmp.clear();
   element_to_candidate.clear();
@@ -638,9 +645,17 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   iEvent.getByToken(tracks_recotosim_, recotosimCollection);
   const auto recotosim = *recotosimCollection;
 
+  edm::Handle<reco::RecoToSimCollection> gsfrecotosimCollection;
+  iEvent.getByToken(gsf_recotosim_, gsfrecotosimCollection);
+  const auto gsfrecotosim = *gsfrecotosimCollection;
+
   edm::Handle<edm::View<reco::Track>> trackHandle;
   iEvent.getByToken(tracks_, trackHandle);
   const edm::View<reco::Track>& tracks = *trackHandle;
+  
+  edm::Handle<edm::View<reco::Track>> gsftrackHandle;
+  iEvent.getByToken(gsftracks_, gsftrackHandle);
+  const edm::View<reco::Track>& gsftracks = *gsftrackHandle;
 
   edm::Handle<edm::View<reco::GsfElectron>> gsfElectronHandle;
   iEvent.getByToken(gsfElectrons_, gsfElectronHandle);
@@ -688,11 +703,55 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     element_distance_d_.push_back(get<2>(d));
   }
 
+  // std::cout << "RecoToSim" << std::endl;
+  // for (const auto& x : recotosim) {
+  //   std::cout << x.key.key();
+  //   for (const auto& tp : x.val) {
+  //     std::cout << " " << tp.first.key();
+  //   }
+  //   std::cout << std::endl;
+  // }
+
+  // std::cout << "GsfRecoToSim" << std::endl;
+  // for (const auto& x : gsfrecotosim) {
+  //   std::cout << x.key.key();
+  //   for (const auto& tp : x.val) {
+  //     std::cout << " " << tp.first.key();
+  //   }
+  //   std::cout << std::endl;
+  // }
+
+  //std::cout << "Gsf" << std::endl;
+  for (unsigned long ntrack = 0; ntrack < gsftracks.size(); ntrack++) {
+    edm::RefToBase<reco::Track> trackref(gsftrackHandle, ntrack);
+    //std::cout << trackref.key() << std::endl;
+    const auto vec_idx_in_all_elements = find_element_ref(all_elements, trackref);
+    
+    //track was not used by PF, we skip as well
+    if (vec_idx_in_all_elements.empty()) {
+      continue;
+    }
+
+    if (gsfrecotosim.find(trackref) != gsfrecotosim.end()) {
+      const auto& tps = gsfrecotosim[trackref];
+      for (const auto& tp : tps) {
+        edm::Ref<std::vector<TrackingParticle>> tpr = tp.first;
+        for (auto idx_in_all_elements : vec_idx_in_all_elements) {
+          //std::cout << "GSF assoc " << ntrack << " " << idx_in_all_elements << " " << tpr.key() << std::endl;
+          trackingparticle_to_element.emplace_back(tpr.key(), idx_in_all_elements);
+          trackingparticle_to_element_cmp.emplace_back(tp.second);
+        }
+      }
+    }
+  }
+
+  //std::cout << "Track" << std::endl;
   //We need to use the original reco::Track collection for track association
   for (unsigned long ntrack = 0; ntrack < tracks.size(); ntrack++) {
     edm::RefToBase<reco::Track> trackref(trackHandle, ntrack);
+    //std::cout << trackref.key() << std::endl;
     const auto vec_idx_in_all_elements = find_element_ref(all_elements, trackref);
-
+    
     //track was not used by PF, we skip as well
     if (vec_idx_in_all_elements.empty()) {
       continue;
@@ -704,11 +763,12 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
         edm::Ref<std::vector<TrackingParticle>> tpr = tp.first;
         for (auto idx_in_all_elements : vec_idx_in_all_elements) {
           trackingparticle_to_element.emplace_back(tpr.key(), idx_in_all_elements);
+          trackingparticle_to_element_cmp.emplace_back(tp.second);
         }
       }
     }
   }
-
+  
   processTrackingParticles(trackingParticles, trackingParticlesHandle);
   
   map<pair<int, int>, float> caloparticle_to_pfcluster;
