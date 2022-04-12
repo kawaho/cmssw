@@ -34,7 +34,7 @@ process.source = cms.Source("PoolSource",
     duplicateCheckMode = cms.untracked.string("noDuplicateCheck")
 )
 
-process.ana = cms.EDAnalyzer('PFAnalysis')
+process.pfana = cms.EDAnalyzer('PFAnalysis')
 
 process.TFileService = cms.Service("TFileService",
     fileName = cms.string("pfntuple.root")
@@ -44,4 +44,11 @@ process.p = cms.Path(
   process.quickTrackAssociatorByHits*
   process.trackingParticleRecoTrackAsssociation*
   process.trackingParticleGsfTrackAssociation*
-  process.ana)
+  process.pfana)
+
+
+#Enable LogTrace in PFAnalysisNtuplizer
+## scram b -j8 USER_CXXFLAGS="-DEDM_ML_DEBUG"
+#process.MessageLogger.cerr.threshold = "DEBUG"
+#process.MessageLogger.debugModules = ["pfana"]
+
