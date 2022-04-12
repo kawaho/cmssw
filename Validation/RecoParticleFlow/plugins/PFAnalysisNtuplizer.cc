@@ -1,58 +1,44 @@
 // Based on RecoNtuple/HGCalAnalysis with modifications for PF
-//
-// user include files
-#include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/one/EDAnalyzer.h"
+// Used for MLPF training
+// Author and maintainer: Joosep Pata (NICPB)
+// cms-mlpf@cern.ch
 
-#include "FWCore/Framework/interface/ESHandle.h"
-#include "FWCore/Framework/interface/Event.h"
-#include "FWCore/Framework/interface/MakerMacros.h"
-
-#include "FWCore/ParameterSet/interface/ParameterSet.h"
-
-#include "DataFormats/CaloRecHit/interface/CaloClusterFwd.h"
-#include "DataFormats/EgammaCandidates/interface/GsfElectron.h"
-#include "DataFormats/GsfTrackReco/interface/GsfTrack.h"
-#include "DataFormats/HcalRecHit/interface/HFRecHit.h"
-#include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
-#include "DataFormats/HcalDetId/interface/HcalDetId.h"
-#include "DataFormats/EcalDetId/interface/EcalSubdetector.h"
-#include "DataFormats/ParticleFlowReco/interface/PFCluster.h"
-#include "DataFormats/VertexReco/interface/Vertex.h"
-#include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
-#include "DataFormats/ParticleFlowReco/interface/PFBlockElementSuperCluster.h"
-#include "DataFormats/ParticleFlowReco/interface/PFBlockElementGsfTrack.h"
-#include "DataFormats/ParticleFlowReco/interface/PFBlockElementTrack.h"
-#include "DataFormats/ParticleFlowReco/interface/PFBlockElementBrem.h"
-#include "DataFormats/ParticleFlowReco/interface/PFBlockElementCluster.h"
-#include "SimDataFormats/CaloAnalysis/interface/CaloParticle.h"
-#include "SimDataFormats/CaloAnalysis/interface/SimCluster.h"
-#include "SimDataFormats/GeneratorProducts/interface/HepMCProduct.h"
-#include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
-#include "SimDataFormats/Associations/interface/TrackAssociation.h"
-#include "DataFormats/ParticleFlowReco/interface/PFBlock.h"
-#include "DataFormats/EgammaReco/interface/SuperCluster.h"
-#include "DataFormats/EgammaReco/interface/ElectronSeed.h"
-
-#include "DataFormats/Math/interface/deltaPhi.h"
-#include "DataFormats/TrackReco/interface/Track.h"
-#include "DataFormats/DetId/interface/DetId.h"
-
-
-#include "Math/Transform3D.h"
-#include "RecoParticleFlow/PFProducer/interface/MLPFModel.h"
-
-#include "CommonTools/UtilAlgos/interface/TFileService.h"
-#include "FWCore/ServiceRegistry/interface/Service.h"
-#include "TH1F.h"
-#include "TVector2.h"
-#include "TTree.h"
+#define LOG LogTrace("PFAnalysisNtuplizer")
 
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
-#include <set>
+
+#include "CommonTools/UtilAlgos/interface/TFileService.h"
+#include "DataFormats/DetId/interface/DetId.h"
+#include "DataFormats/EgammaCandidates/interface/GsfElectron.h"
+#include "DataFormats/EgammaReco/interface/ElectronSeed.h"
+#include "DataFormats/EgammaReco/interface/SuperCluster.h"
+#include "DataFormats/GsfTrackReco/interface/GsfTrack.h"
+#include "DataFormats/Math/interface/deltaPhi.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
+#include "DataFormats/ParticleFlowReco/interface/PFBlock.h"
+#include "DataFormats/ParticleFlowReco/interface/PFBlockElementBrem.h"
+#include "DataFormats/ParticleFlowReco/interface/PFBlockElementCluster.h"
+#include "DataFormats/ParticleFlowReco/interface/PFBlockElementGsfTrack.h"
+#include "DataFormats/ParticleFlowReco/interface/PFBlockElementSuperCluster.h"
+#include "DataFormats/ParticleFlowReco/interface/PFBlockElementTrack.h"
+#include "DataFormats/ParticleFlowReco/interface/PFCluster.h"
+#include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/VertexReco/interface/Vertex.h"
+#include "FWCore/Framework/interface/ESHandle.h"
+#include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "RecoParticleFlow/PFProducer/interface/MLPFModel.h"
+#include "SimDataFormats/Associations/interface/TrackAssociation.h"
+#include "SimDataFormats/CaloAnalysis/interface/CaloParticle.h"
+#include "SimDataFormats/CaloAnalysis/interface/SimCluster.h"
+#include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
+#include "TTree.h"
 
 using namespace std;
 
@@ -95,24 +81,8 @@ vector<int> find_element_ref(const vector<ElementWithIndex>& vec, const edm::Ref
   return ret;
 }
 
-double detid_compare(const map<uint64_t, double>& rechits, const map<uint64_t, double>& simhits) {
-  double ret = 0.0;
-
-  for (const auto& rh : rechits) {
-    for (const auto& sh : simhits) {
-      if (rh.first == sh.first) {
-        //rechit energy times simhit fraction
-        ret += rh.second * sh.second;
-        break;
-      }
-    }
-  }
-  return ret;
-}
-
 class PFAnalysis : public edm::one::EDAnalyzer<edm::one::WatchRuns, edm::one::SharedResources> {
 public:
-  typedef ROOT::Math::Transform3D::Point Point;
 
   PFAnalysis();
   explicit PFAnalysis(const edm::ParameterSet&);
@@ -319,7 +289,6 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
 
   usesResource(TFileService::kSharedResource);
   edm::Service<TFileService> fs;
-  fs->make<TH1F>("total", "total", 100, 0, 5.);
 
   t_ = fs->make<TTree>("pftree", "pftree");
 
@@ -703,28 +672,28 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     element_distance_d_.push_back(get<2>(d));
   }
 
-  // std::cout << "RecoToSim" << std::endl;
-  // for (const auto& x : recotosim) {
-  //   std::cout << x.key.key();
-  //   for (const auto& tp : x.val) {
-  //     std::cout << " " << tp.first.key();
-  //   }
-  //   std::cout << std::endl;
-  // }
+#ifdef EDM_ML_DEBUG
+  LOG << "RecoToSim";
+  for (const auto& x : recotosim) {
+    LOG << "reco=" << x.key.key();
+    for (const auto& tp : x.val) {
+      LOG << "tp=" << tp.first.key();
+    }
+  }
 
-  // std::cout << "GsfRecoToSim" << std::endl;
-  // for (const auto& x : gsfrecotosim) {
-  //   std::cout << x.key.key();
-  //   for (const auto& tp : x.val) {
-  //     std::cout << " " << tp.first.key();
-  //   }
-  //   std::cout << std::endl;
-  // }
+  LOG << "GsfRecoToSim" << std::endl;
+  for (const auto& x : gsfrecotosim) {
+    LOG << "reco=" << x.key.key();
+    for (const auto& tp : x.val) {
+      LOG << "tp=" << tp.first.key();
+    }
+  }
+#endif
 
-  //std::cout << "Gsf" << std::endl;
+  LOG << "Gsf";
   for (unsigned long ntrack = 0; ntrack < gsftracks.size(); ntrack++) {
     edm::RefToBase<reco::Track> trackref(gsftrackHandle, ntrack);
-    //std::cout << trackref.key() << std::endl;
+    LOG << "trackref=" << trackref.key();
     const auto vec_idx_in_all_elements = find_element_ref(all_elements, trackref);
     
     //track was not used by PF, we skip as well
@@ -737,7 +706,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       for (const auto& tp : tps) {
         edm::Ref<std::vector<TrackingParticle>> tpr = tp.first;
         for (auto idx_in_all_elements : vec_idx_in_all_elements) {
-          //std::cout << "GSF assoc " << ntrack << " " << idx_in_all_elements << " " << tpr.key() << std::endl;
+          LOG << "GSF assoc " << ntrack << " " << idx_in_all_elements << " " << tpr.key();
           trackingparticle_to_element.emplace_back(tpr.key(), idx_in_all_elements);
           trackingparticle_to_element_cmp.emplace_back(tp.second);
         }
@@ -745,11 +714,11 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     }
   }
 
-  //std::cout << "Track" << std::endl;
+  LOG << "Track";
   //We need to use the original reco::Track collection for track association
   for (unsigned long ntrack = 0; ntrack < tracks.size(); ntrack++) {
     edm::RefToBase<reco::Track> trackref(trackHandle, ntrack);
-    //std::cout << trackref.key() << std::endl;
+    LOG << "trackref=" << trackref.key() << std::endl;
     const auto vec_idx_in_all_elements = find_element_ref(all_elements, trackref);
     
     //track was not used by PF, we skip as well
@@ -762,6 +731,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       for (const auto& tp : tps) {
         edm::Ref<std::vector<TrackingParticle>> tpr = tp.first;
         for (auto idx_in_all_elements : vec_idx_in_all_elements) {
+          LOG << "track assoc " << ntrack << " " << idx_in_all_elements << " " << tpr.key();
           trackingparticle_to_element.emplace_back(tpr.key(), idx_in_all_elements);
           trackingparticle_to_element_cmp.emplace_back(tp.second);
         }
@@ -787,6 +757,8 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     caloparticle_bx_.push_back(cp.eventId().bunchCrossing());
     caloparticle_pid_.push_back(cp.pdgId());
 
+    LOG << "cp=" << ncaloparticle << " pt=" << cp.p4().pt() << " typ=" << cp.pdgId();
+
     const auto& simtrack = cp.g4Tracks().at(0);
 
     int caloparticle_to_trackingparticle = -1;
@@ -804,6 +776,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
 
     for (const auto& simcluster : cp.simClusters()) {
       for (const auto& hf : simcluster->hits_and_fractions()) {
+        LOG << "  cp=" << ncaloparticle << " detid=" << hf.first << " " << hf.second;
         simhit_to_caloparticle[hf.first].push_back({ncaloparticle, hf.second});
       }
     }  //simclusters
@@ -815,6 +788,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   for (size_t ielem = 0; ielem < all_elements.size(); ielem++) {
     const auto& elem = all_elements[ielem];
     const auto& type = elem.orig.type();
+    LOG << "elem=" << ielem << " typ=" << type;
     if (type == reco::PFBlockElement::ECAL || type == reco::PFBlockElement::HCAL || type == reco::PFBlockElement::PS1 ||
         type == reco::PFBlockElement::PS2 || type == reco::PFBlockElement::HO || type == reco::PFBlockElement::HFHAD ||
         type == reco::PFBlockElement::HFEM) {
@@ -826,6 +800,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       const vector<reco::PFRecHitFraction>& rechit_fracs = cluster.recHitFractions();
       for (const auto& rh : rechit_fracs) {
         const reco::PFRecHit pfrh = *rh.recHitRef();
+        LOG << "  elem=" << ielem << " detid=" << pfrh.detId() << " " << pfrh.energy() << " " << rh.fraction();
         pfcluster_to_rechit[ielem].push_back({pfrh.detId(), pfrh.energy()*rh.fraction()});
       }  //rechit_fracs
     } else if (type == reco::PFBlockElement::SC) {
@@ -836,6 +811,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       //all rechits and the energy fractions in this cluster
       const auto& rechit_fracs = cluster.hitsAndFractions();
       for (const auto& rh : rechit_fracs) {
+        LOG << "  elem=" << ielem << " detid=" << rh.first.rawId() << " " << rh.second;
         pfcluster_to_rechit[ielem].push_back({rh.first.rawId(), rh.second});
       }  //rechit_fracs
     }
@@ -1139,6 +1115,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     const auto energy = cp_to_pf.second;
     caloparticle_to_element.push_back(cp_pf);
     caloparticle_to_element_cmp.push_back(energy);
+    LOG << "cp_to_elem=" << cp_pf.first << "," << cp_pf.second << " e=" << energy;
   }
 
   //associate candidates to elements
