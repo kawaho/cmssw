@@ -143,6 +143,7 @@ private:
   vector<float> trackingparticle_exy_;
   vector<int> trackingparticle_mother_;
   vector<int> trackingparticle_pid_;
+  vector<int> trackingparticle_charge_;
 
   vector<float> simcluster_eta_;
   vector<float> simcluster_phi_;
@@ -166,6 +167,7 @@ private:
   vector<float> caloparticle_bx_;
   vector<float> caloparticle_ev_;
   vector<int> caloparticle_pid_;
+  vector<int> caloparticle_charge_;
   vector<int> caloparticle_idx_trackingparticle_;
 
   vector<float> simhit_frac_;
@@ -310,6 +312,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("trackingparticle_bx", &trackingparticle_bx_);
   t_->Branch("trackingparticle_ev", &trackingparticle_ev_);
   t_->Branch("trackingparticle_pid", &trackingparticle_pid_);
+  t_->Branch("trackingparticle_charge", &trackingparticle_charge_);
 
   t_->Branch("simcluster_eta", &simcluster_eta_);
   t_->Branch("simcluster_phi", &simcluster_phi_);
@@ -332,6 +335,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("caloparticle_bx", &caloparticle_bx_);
   t_->Branch("caloparticle_ev", &caloparticle_ev_);
   t_->Branch("caloparticle_pid", &caloparticle_pid_);
+  t_->Branch("caloparticle_charge", &caloparticle_charge_);
   t_->Branch("caloparticle_idx_trackingparticle", &caloparticle_idx_trackingparticle_);
 
   if (saveHits) {
@@ -473,6 +477,7 @@ void PFAnalysis::clearVariables() {
   trackingparticle_exy_.clear();
   trackingparticle_mother_.clear();
   trackingparticle_pid_.clear();
+  trackingparticle_charge_.clear();
 
   simcluster_eta_.clear();
   simcluster_phi_.clear();
@@ -496,6 +501,7 @@ void PFAnalysis::clearVariables() {
   caloparticle_bx_.clear();
   caloparticle_ev_.clear();
   caloparticle_pid_.clear();
+  caloparticle_charge_.clear();
   caloparticle_idx_trackingparticle_.clear();
 
   if (saveHits) {
@@ -756,6 +762,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     caloparticle_ev_.push_back(cp.eventId().event());
     caloparticle_bx_.push_back(cp.eventId().bunchCrossing());
     caloparticle_pid_.push_back(cp.pdgId());
+    caloparticle_charge_.push_back(cp.charge());
 
     LOG << "cp=" << ncaloparticle << " pt=" << cp.p4().pt() << " typ=" << cp.pdgId();
 
@@ -1187,6 +1194,7 @@ void PFAnalysis::processTrackingParticles(const edm::View<TrackingParticle>& tra
     trackingparticle_ovz_.push_back(orig_vtx.z());
 
     trackingparticle_pid_.push_back(tp.pdgId());
+    trackingparticle_charge_.push_back(tp.charge());
   }
 }
 
