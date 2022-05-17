@@ -6,8 +6,98 @@
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 
 namespace reco::mlpf {
+
+  static constexpr unsigned int NUM_ELEMENT_FEATURES = 41;
+
+  struct ElementFeatures {
+    float type;
+    float pt;
+    float eta;
+    float phi;
+    float energy;
+    float layer;
+    float depth;
+    float charge;
+    float trajpoint;
+    float eta_ecal;
+    float phi_ecal;
+    float eta_hcal;
+    float phi_hcal;
+    float muon_dt_hits;
+    float muon_csc_hits;
+    float muon_type;
+    float px;
+    float py;
+    float pz;
+    float deltap;
+    float sigmadeltap;
+    float gsf_electronseed_trkorecal;
+    float gsf_electronseed_dnn1;
+    float gsf_electronseed_dnn2;
+    float gsf_electronseed_dnn3;
+    float gsf_electronseed_dnn4;
+    float gsf_electronseed_dnn5;
+    float num_hits;
+    float cluster_flags;
+    float corr_energy;
+    float corr_energy_err;
+    float vx;
+    float vy;
+    float vz;
+    float pterror;
+    float etaerror;
+    float phierror;
+    float lambda;
+    float lambdaerror;
+    float theta;
+    float thetaerror;
+
+    std::array<float, NUM_ELEMENT_FEATURES> as_array() {
+      return {{type,
+               pt,
+               eta,
+               phi,
+               energy,
+               layer,
+               depth,
+               charge,
+               trajpoint,
+               eta_ecal,
+               phi_ecal,
+               eta_hcal,
+               phi_hcal,
+               muon_dt_hits,
+               muon_csc_hits,
+               muon_type,
+               px,
+               py,
+               pz,
+               deltap,
+               sigmadeltap,
+               gsf_electronseed_trkorecal,
+               gsf_electronseed_dnn1,
+               gsf_electronseed_dnn2,
+               gsf_electronseed_dnn3,
+               gsf_electronseed_dnn4,
+               gsf_electronseed_dnn5,
+               num_hits,
+               cluster_flags,
+               corr_energy,
+               corr_energy_err,
+               vx,
+               vy,
+               vz,
+               pterror,
+               etaerror,
+               phierror,
+               lambda,
+               lambdaerror,
+               theta,
+               thetaerror}};
+    }
+  };
+
   //The model takes the following number of features for each input PFElement
-  static constexpr unsigned int NUM_ELEMENT_FEATURES = 25;
   static constexpr unsigned int NUM_OUTPUT_FEATURES = 14;
 
   //these are defined at model creation time and set the random LSH codebook size
@@ -59,7 +149,8 @@ namespace reco::mlpf {
       {11, 11},
   };
 
-  std::array<float, NUM_ELEMENT_FEATURES> getElementProperties(const reco::PFBlockElement& orig);
+  ElementFeatures getElementProperties(const reco::PFBlockElement& orig,
+                                       const edm::View<reco::GsfElectron>& gsfElectrons);
   float normalize(float in);
 
   int argMax(std::vector<float> const& vec);

@@ -1,6 +1,6 @@
 // Based on RecoNtuple/HGCalAnalysis with modifications for PF
 // Used for MLPF training
-// Author and maintainer: Joosep Pata (NICPB)
+// Author and maintainer: Joosep Pata (KBFI, Tallinn, Estonia)
 // cms-mlpf@cern.ch
 
 #define LOG LogTrace("PFAnalysisNtuplizer")
@@ -38,6 +38,7 @@
 #include "SimDataFormats/CaloAnalysis/interface/CaloParticle.h"
 #include "SimDataFormats/CaloAnalysis/interface/SimCluster.h"
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
+#include "RecoParticleFlow/PFProducer/interface/MLPFModel.h"
 #include "TTree.h"
 
 using namespace std;
@@ -83,7 +84,6 @@ vector<int> find_element_ref(const vector<ElementWithIndex>& vec, const edm::Ref
 
 class PFAnalysis : public edm::one::EDAnalyzer<edm::one::WatchRuns, edm::one::SharedResources> {
 public:
-
   PFAnalysis();
   explicit PFAnalysis(const edm::ParameterSet&);
   ~PFAnalysis() override;
@@ -627,7 +627,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   edm::Handle<edm::View<reco::Track>> trackHandle;
   iEvent.getByToken(tracks_, trackHandle);
   const edm::View<reco::Track>& tracks = *trackHandle;
-  
+
   edm::Handle<edm::View<reco::Track>> gsftrackHandle;
   iEvent.getByToken(gsftracks_, gsftrackHandle);
   const edm::View<reco::Track>& gsftracks = *gsftrackHandle;
@@ -701,7 +701,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     edm::RefToBase<reco::Track> trackref(gsftrackHandle, ntrack);
     LOG << "trackref=" << trackref.key();
     const auto vec_idx_in_all_elements = find_element_ref(all_elements, trackref);
-    
+
     //track was not used by PF, we skip as well
     if (vec_idx_in_all_elements.empty()) {
       continue;
@@ -726,7 +726,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     edm::RefToBase<reco::Track> trackref(trackHandle, ntrack);
     LOG << "trackref=" << trackref.key() << std::endl;
     const auto vec_idx_in_all_elements = find_element_ref(all_elements, trackref);
-    
+
     //track was not used by PF, we skip as well
     if (vec_idx_in_all_elements.empty()) {
       continue;
@@ -744,9 +744,9 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       }
     }
   }
-  
+
   processTrackingParticles(trackingParticles, trackingParticlesHandle);
-  
+
   map<pair<int, int>, float> caloparticle_to_pfcluster;
   map<uint64_t, vector<pair<int, float>>> simhit_to_caloparticle;
   for (unsigned int ncaloparticle = 0; ncaloparticle < caloParticles.size(); ncaloparticle++) {
@@ -779,7 +779,6 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       }
     }  //trackingParticles
     caloparticle_idx_trackingparticle_.push_back(caloparticle_to_trackingparticle);
-      
 
     for (const auto& simcluster : cp.simClusters()) {
       for (const auto& hf : simcluster->hits_and_fractions()) {
@@ -787,9 +786,8 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
         simhit_to_caloparticle[hf.first].push_back({ncaloparticle, hf.second});
       }
     }  //simclusters
-  } //caloParticles
+  }    //caloParticles
 
-  
   //fill pfcluster to rechit
   map<int, vector<pair<uint64_t, float>>> pfcluster_to_rechit;
   for (size_t ielem = 0; ielem < all_elements.size(); ielem++) {
@@ -808,7 +806,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       for (const auto& rh : rechit_fracs) {
         const reco::PFRecHit pfrh = *rh.recHitRef();
         LOG << "  elem=" << ielem << " detid=" << pfrh.detId() << " " << pfrh.energy() << " " << rh.fraction();
-        pfcluster_to_rechit[ielem].push_back({pfrh.detId(), pfrh.energy()*rh.fraction()});
+        pfcluster_to_rechit[ielem].push_back({pfrh.detId(), pfrh.energy() * rh.fraction()});
       }  //rechit_fracs
     } else if (type == reco::PFBlockElement::SC) {
       const auto& clref = ((const reco::PFBlockElementSuperCluster*)&(elem.orig))->superClusterRef();
@@ -822,7 +820,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
         pfcluster_to_rechit[ielem].push_back({rh.first.rawId(), rh.second});
       }  //rechit_fracs
     }
-  } //all_elements
+  }  //all_elements
 
   //fill elements
   for (size_t ielem = 0; ielem < all_elements.size(); ielem++) {
@@ -830,291 +828,67 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     const auto& orig = elem.orig;
     reco::PFBlockElement::Type type = orig.type();
 
-    float pt = 0.0;
-    float ptError = 0.0;
-    float deltap = 0.0;
-    float sigmadeltap = 0.0;
-    float px = 0.0;
-    float py = 0.0;
-    float pz = 0.0;
-    float eta = 0.0;
-    float etaError = 0.0;
-    float phi = 0.0;
-    float phiError = 0.0;
-    float lambda = 0.0;
-    float lambdaError = 0.0;
-    float theta = 0.0;
-    float thetaError = 0.0;
-    float energy = 0.0;
-    float vx = 0.0;
-    float vy = 0.0;
-    float vz = 0.0;
-    float corr_energy = 0.0;
-    float corr_energy_err = 0.0;
-    float trajpoint = 0.0;
-    float eta_ecal = 0.0;
-    float phi_ecal = 0.0;
-    float eta_hcal = 0.0;
-    float phi_hcal = 0.0;
-    int charge = 0;
-    int layer = 0;
-    float depth = 0;
-    float muon_dt_hits = 0.0;
-    float muon_csc_hits = 0.0;
-    float muon_type = 0.0;
-    float cluster_flags = 0.0;
-    float gsf_electronseed_trkorecal = 0.0;
-    float gsf_electronseed_dnn1 = 0.0;
-    float gsf_electronseed_dnn2 = 0.0;
-    float gsf_electronseed_dnn3 = 0.0;
-    float gsf_electronseed_dnn4 = 0.0;
-    float gsf_electronseed_dnn5 = 0.0;
-    float num_hits = 0.0;
-
-    if (type == reco::PFBlockElement::TRACK) {
-      const auto& matched_pftrack = orig.trackRefPF();
-      if (matched_pftrack.isNonnull()) {
-        const auto& atECAL = matched_pftrack->extrapolatedPoint(reco::PFTrajectoryPoint::ECALShowerMax);
-        const auto& atHCAL = matched_pftrack->extrapolatedPoint(reco::PFTrajectoryPoint::HCALEntrance);
-        if (atHCAL.isValid()) {
-          eta_hcal = atHCAL.positionREP().eta();
-          phi_hcal = atHCAL.positionREP().phi();
-        }
-        if (atECAL.isValid()) {
-          eta_ecal = atECAL.positionREP().eta();
-          phi_ecal = atECAL.positionREP().phi();
-        }
-      }
-      const auto& ref = ((const reco::PFBlockElementTrack*)&orig)->trackRef();
-      pt = ref->pt();
-      ptError = ref->ptError();
-      px = ref->px();
-      py = ref->py();
-      pz = ref->pz();
-      eta = ref->eta();
-      etaError = ref->etaError();
-      phi = ref->phi();
-      phiError = ref->phiError();
-      energy = ref->p();
-      charge = ref->charge();
-      num_hits = ref->recHitsSize();
-      lambda = ref->lambda();
-      lambdaError = ref->lambdaError();
-      theta = ref->theta();
-      thetaError = ref->thetaError();
-      vx = ref->vx();
-      vy = ref->vy();
-      vz = ref->vz();
-
-      reco::MuonRef muonRef = orig.muonRef();
-      if (muonRef.isNonnull()) {
-        reco::TrackRef standAloneMu = muonRef->standAloneMuon();
-        if (standAloneMu.isNonnull()) {
-          muon_dt_hits = standAloneMu->hitPattern().numberOfValidMuonDTHits();
-          muon_csc_hits = standAloneMu->hitPattern().numberOfValidMuonCSCHits();
-        }
-        muon_type = muonRef->type();
-      }
-
-    } else if (type == reco::PFBlockElement::BREM) {
-      const auto* orig2 = (const reco::PFBlockElementBrem*)&orig;
-      const auto& ref = orig2->GsftrackRef();
-      trajpoint = orig2->indTrajPoint();
-      if (ref.isNonnull()) {
-        deltap = orig2->DeltaP();
-        sigmadeltap = orig2->SigmaDeltaP();
-        pt = ref->pt();
-        px = ref->px();
-        py = ref->py();
-        pz = ref->pz();
-        eta = ref->eta();
-        phi = ref->phi();
-        energy = ref->p();
-        charge = ref->charge();
-      }
-
-      const auto& gsfextraref = ref->extra();
-      if (gsfextraref.isAvailable() && gsfextraref->seedRef().isAvailable()) {
-        reco::ElectronSeedRef seedref = gsfextraref->seedRef().castTo<reco::ElectronSeedRef>();
-        if (seedref.isAvailable()) {
-          if (seedref->isEcalDriven()) {
-            gsf_electronseed_trkorecal = 1.0;
-          } else if (seedref->isTrackerDriven()) {
-            gsf_electronseed_trkorecal = 2.0;
-          }
-        }
-      }
-
-    } else if (type == reco::PFBlockElement::GSF) {
-      //requires to keep GsfPFRecTracks
-      const auto* orig2 = (const reco::PFBlockElementGsfTrack*)&orig;
-      const auto& ref = orig2->GsftrackRef();
-
-      pt = ref->ptMode();
-      ptError = ref->ptModeError();
-      px = ref->pxMode();
-      py = ref->pyMode();
-      pz = ref->pzMode();
-      eta = ref->etaMode();
-      etaError = ref->etaModeError();
-      phi = ref->phiMode();
-      phiError = ref->phiModeError();
-      energy = ref->pMode();
-
-      const auto& vec = orig2->Pin();
-      eta_ecal = vec.eta();
-      phi_ecal = vec.phi();
-
-      const auto& vec2 = orig2->Pout();
-      eta_hcal = vec2.eta();
-      phi_hcal = vec2.phi();
-
-      if (!orig2->GsftrackRefPF().isNull()) {
-        charge = orig2->GsftrackRefPF()->charge();
-        num_hits = orig2->GsftrackRefPF()->PFRecBrem().size();
-      }
-
-      lambda = ref->lambdaMode();
-      lambdaError = ref->lambdaModeError();
-      theta = ref->thetaMode();
-      thetaError = ref->thetaModeError();
-      vx = ref->vx();
-      vy = ref->vy();
-      vz = ref->vz();
-
-      //Find the GSF electron that corresponds to this GSF track
-      for (const auto& gsfEle : gsfElectrons) {
-        if (ref == gsfEle.gsfTrack()) {
-          gsf_electronseed_dnn1 = gsfEle.dnn_signal_Isolated();
-          gsf_electronseed_dnn2 = gsfEle.dnn_signal_nonIsolated();
-          gsf_electronseed_dnn3 = gsfEle.dnn_bkg_nonIsolated();
-          gsf_electronseed_dnn4 = gsfEle.dnn_bkg_Tau();
-          gsf_electronseed_dnn5 = gsfEle.dnn_bkg_Photon();
-          break;
-        }
-      }
-
-      const auto& gsfextraref = ref->extra();
-      if (gsfextraref.isAvailable() && gsfextraref->seedRef().isAvailable()) {
-        reco::ElectronSeedRef seedref = gsfextraref->seedRef().castTo<reco::ElectronSeedRef>();
-        if (seedref.isAvailable()) {
-          if (seedref->isEcalDriven()) {
-            gsf_electronseed_trkorecal = 1.0;
-          } else if (seedref->isTrackerDriven()) {
-            gsf_electronseed_trkorecal = 2.0;
-          }
-        }
-      };
-
-    } else if (type == reco::PFBlockElement::ECAL || type == reco::PFBlockElement::PS1 ||
-               type == reco::PFBlockElement::PS2 || type == reco::PFBlockElement::HCAL ||
-               type == reco::PFBlockElement::HO || type == reco::PFBlockElement::HFHAD ||
-               type == reco::PFBlockElement::HFEM) {
-      const auto& ref = ((const reco::PFBlockElementCluster*)&orig)->clusterRef();
-      const auto& found = pfcluster_to_rechit.find(ielem);
-      if (found != pfcluster_to_rechit.end()) {
-        for (const auto& rechit_frac : (*found).second) {
-          const auto& found_cp = simhit_to_caloparticle.find(rechit_frac.first);
-          if (found_cp != simhit_to_caloparticle.end()) {
-            for (const auto& simhit_frac : (*found_cp).second) {
-              //(icalo, ielem) += rechit_energy*rechit_fraction*simhit_fraction
-              const pair<size_t, size_t> key{simhit_frac.first, ielem};
-              if (caloparticle_to_pfcluster.find(key) == caloparticle_to_pfcluster.end()) {
-                caloparticle_to_pfcluster[key] = 0.0;
-              }
-              caloparticle_to_pfcluster[key] += rechit_frac.second*simhit_frac.second;
+    const auto& found = pfcluster_to_rechit.find(ielem);
+    if (found != pfcluster_to_rechit.end()) {
+      for (const auto& rechit_frac : (*found).second) {
+        const auto& found_cp = simhit_to_caloparticle.find(rechit_frac.first);
+        if (found_cp != simhit_to_caloparticle.end()) {
+          for (const auto& simhit_frac : (*found_cp).second) {
+            //(icalo, ielem) += rechit_energy*rechit_fraction*simhit_fraction
+            const pair<size_t, size_t> key{simhit_frac.first, ielem};
+            if (caloparticle_to_pfcluster.find(key) == caloparticle_to_pfcluster.end()) {
+              caloparticle_to_pfcluster[key] = 0.0;
             }
-          } 
-        } 
-      }
-      if (ref.isNonnull()) {
-        cluster_flags = ref->flags();
-        eta = ref->eta();
-        phi = ref->phi();
-        pt = ref->pt();
-        px = ref->position().x();
-        py = ref->position().y();
-        pz = ref->position().z();
-        energy = ref->energy();
-        corr_energy = ref->correctedEnergy();
-        corr_energy_err = ref->correctedEnergyUncertainty();
-        layer = ref->layer();
-        depth = ref->depth();
-        num_hits = ref->recHitFractions().size();
-        vx = ref->vx();
-        vy = ref->vy();
-        vz = ref->vz();
-      }
-    } else if (type == reco::PFBlockElement::SC) {
-      const auto& clref = ((const reco::PFBlockElementSuperCluster*)&orig)->superClusterRef();
-      if (clref.isNonnull()) {
-        //Find the GSF electron that corresponds to this SC
-        for (const auto& gsfEle : gsfElectrons) {
-          if (clref == gsfEle.superCluster()) {
-            gsf_electronseed_dnn1 = gsfEle.dnn_signal_Isolated();
-            gsf_electronseed_dnn2 = gsfEle.dnn_signal_nonIsolated();
-            gsf_electronseed_dnn3 = gsfEle.dnn_bkg_nonIsolated();
-            gsf_electronseed_dnn4 = gsfEle.dnn_bkg_Tau();
-            gsf_electronseed_dnn5 = gsfEle.dnn_bkg_Photon();
-            break;
+            caloparticle_to_pfcluster[key] += rechit_frac.second * simhit_frac.second;
           }
         }
-        cluster_flags = clref->flags();
-        eta = clref->eta();
-        phi = clref->phi();
-        px = clref->position().x();
-        py = clref->position().y();
-        pz = clref->position().z();
-        energy = clref->energy();
-        corr_energy = clref->preshowerEnergy();
-        num_hits = clref->clustersSize();
-        etaError = clref->etaWidth();
-        phiError = clref->phiWidth();
       }
     }
 
-    element_pt_.push_back(pt);
-    element_pterror_.push_back(ptError);
-    element_px_.push_back(px);
-    element_py_.push_back(py);
-    element_pz_.push_back(pz);
-    element_deltap_.push_back(deltap);
-    element_sigmadeltap_.push_back(sigmadeltap);
-    element_eta_.push_back(eta);
-    element_etaerror_.push_back(etaError);
-    element_phi_.push_back(phi);
-    element_phierror_.push_back(phiError);
-    element_energy_.push_back(energy);
-    element_corr_energy_.push_back(corr_energy);
-    element_corr_energy_err_.push_back(corr_energy_err);
-    element_eta_ecal_.push_back(eta_ecal);
-    element_phi_ecal_.push_back(phi_ecal);
-    element_eta_hcal_.push_back(eta_hcal);
-    element_phi_hcal_.push_back(phi_hcal);
-    element_charge_.push_back(charge);
-    element_type_.push_back(type);
-    element_layer_.push_back(layer);
-    element_depth_.push_back(depth);
-    element_trajpoint_.push_back(trajpoint);
-    element_muon_dt_hits_.push_back(muon_dt_hits);
-    element_muon_csc_hits_.push_back(muon_csc_hits);
-    element_muon_type_.push_back(muon_type);
-    element_cluster_flags_.push_back(cluster_flags);
-    element_gsf_electronseed_trkorecal_.push_back(gsf_electronseed_trkorecal);
-    element_gsf_electronseed_dnn1_.push_back(gsf_electronseed_dnn1);
-    element_gsf_electronseed_dnn2_.push_back(gsf_electronseed_dnn2);
-    element_gsf_electronseed_dnn3_.push_back(gsf_electronseed_dnn3);
-    element_gsf_electronseed_dnn4_.push_back(gsf_electronseed_dnn4);
-    element_gsf_electronseed_dnn5_.push_back(gsf_electronseed_dnn5);
-    element_num_hits_.push_back(num_hits);
-    element_lambda_.push_back(lambda);
-    element_lambdaerror_.push_back(lambdaError);
-    element_theta_.push_back(theta);
-    element_thetaerror_.push_back(thetaError);
-    element_vx_.push_back(vx);
-    element_vy_.push_back(vy);
-    element_vz_.push_back(vz);
-  } //all_elements
+    const auto& props = reco::mlpf::getElementProperties(orig, gsfElectrons);
+
+    element_pt_.push_back(props.pt);
+    element_pterror_.push_back(props.pterror);
+    element_px_.push_back(props.px);
+    element_py_.push_back(props.py);
+    element_pz_.push_back(props.pz);
+    element_deltap_.push_back(props.deltap);
+    element_sigmadeltap_.push_back(props.sigmadeltap);
+    element_eta_.push_back(props.eta);
+    element_etaerror_.push_back(props.etaerror);
+    element_phi_.push_back(props.phi);
+    element_phierror_.push_back(props.phierror);
+    element_energy_.push_back(props.energy);
+    element_corr_energy_.push_back(props.corr_energy);
+    element_corr_energy_err_.push_back(props.corr_energy_err);
+    element_eta_ecal_.push_back(props.eta_ecal);
+    element_phi_ecal_.push_back(props.phi_ecal);
+    element_eta_hcal_.push_back(props.eta_hcal);
+    element_phi_hcal_.push_back(props.phi_hcal);
+    element_charge_.push_back(props.charge);
+    element_type_.push_back(props.type);
+    element_layer_.push_back(props.layer);
+    element_depth_.push_back(props.depth);
+    element_trajpoint_.push_back(props.trajpoint);
+    element_muon_dt_hits_.push_back(props.muon_dt_hits);
+    element_muon_csc_hits_.push_back(props.muon_csc_hits);
+    element_muon_type_.push_back(props.muon_type);
+    element_cluster_flags_.push_back(props.cluster_flags);
+    element_gsf_electronseed_trkorecal_.push_back(props.gsf_electronseed_trkorecal);
+    element_gsf_electronseed_dnn1_.push_back(props.gsf_electronseed_dnn1);
+    element_gsf_electronseed_dnn2_.push_back(props.gsf_electronseed_dnn2);
+    element_gsf_electronseed_dnn3_.push_back(props.gsf_electronseed_dnn3);
+    element_gsf_electronseed_dnn4_.push_back(props.gsf_electronseed_dnn4);
+    element_gsf_electronseed_dnn5_.push_back(props.gsf_electronseed_dnn5);
+    element_num_hits_.push_back(props.num_hits);
+    element_lambda_.push_back(props.lambda);
+    element_lambdaerror_.push_back(props.lambdaerror);
+    element_theta_.push_back(props.theta);
+    element_thetaerror_.push_back(props.thetaerror);
+    element_vx_.push_back(props.vx);
+    element_vy_.push_back(props.vy);
+    element_vz_.push_back(props.vz);
+  }  //all_elements
 
   //fill caloparticle_to_element
   for (const auto& cp_to_pf : caloparticle_to_pfcluster) {

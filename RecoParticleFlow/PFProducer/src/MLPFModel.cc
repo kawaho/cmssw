@@ -14,31 +14,49 @@
 namespace reco::mlpf {
 
   //Prepares the input array of floats for a single PFElement
-  std::array<float, NUM_ELEMENT_FEATURES> getElementProperties(const reco::PFBlockElement& orig) {
+  ElementFeatures getElementProperties(const reco::PFBlockElement& orig,
+                                       const edm::View<reco::GsfElectron>& gsfElectrons) {
     const auto type = orig.type();
+
     float pt = 0.0;
+    float pterror = 0.0;
     float deltap = 0.0;
     float sigmadeltap = 0.0;
     float px = 0.0;
     float py = 0.0;
     float pz = 0.0;
     float eta = 0.0;
+    float etaerror = 0.0;
     float phi = 0.0;
+    float phierror = 0.0;
+    float lambda = 0.0;
+    float lambdaerror = 0.0;
+    float theta = 0.0;
+    float thetaerror = 0.0;
     float energy = 0.0;
+    float vx = 0.0;
+    float vy = 0.0;
+    float vz = 0.0;
     float corr_energy = 0.0;
+    float corr_energy_err = 0.0;
     float trajpoint = 0.0;
     float eta_ecal = 0.0;
     float phi_ecal = 0.0;
     float eta_hcal = 0.0;
     float phi_hcal = 0.0;
-    float charge = 0;
-    float layer = 0;
+    int charge = 0;
+    int layer = 0;
     float depth = 0;
     float muon_dt_hits = 0.0;
     float muon_csc_hits = 0.0;
     float muon_type = 0.0;
     float cluster_flags = 0.0;
     float gsf_electronseed_trkorecal = 0.0;
+    float gsf_electronseed_dnn1 = 0.0;
+    float gsf_electronseed_dnn2 = 0.0;
+    float gsf_electronseed_dnn3 = 0.0;
+    float gsf_electronseed_dnn4 = 0.0;
+    float gsf_electronseed_dnn5 = 0.0;
     float num_hits = 0.0;
 
     if (type == reco::PFBlockElement::TRACK) {
@@ -57,14 +75,24 @@ namespace reco::mlpf {
       }
       const auto& ref = ((const reco::PFBlockElementTrack*)&orig)->trackRef();
       pt = ref->pt();
+      pterror = ref->ptError();
       px = ref->px();
       py = ref->py();
       pz = ref->pz();
       eta = ref->eta();
+      etaerror = ref->etaError();
       phi = ref->phi();
+      phierror = ref->phiError();
       energy = ref->p();
       charge = ref->charge();
       num_hits = ref->recHitsSize();
+      lambda = ref->lambda();
+      lambdaerror = ref->lambdaError();
+      theta = ref->theta();
+      thetaerror = ref->thetaError();
+      vx = ref->vx();
+      vy = ref->vy();
+      vz = ref->vz();
 
       reco::MuonRef muonRef = orig.muonRef();
       if (muonRef.isNonnull()) {
@@ -108,25 +136,51 @@ namespace reco::mlpf {
     } else if (type == reco::PFBlockElement::GSF) {
       //requires to keep GsfPFRecTracks
       const auto* orig2 = (const reco::PFBlockElementGsfTrack*)&orig;
+      const auto& ref = orig2->GsftrackRef();
+
+      pt = ref->ptMode();
+      pterror = ref->ptModeError();
+      px = ref->pxMode();
+      py = ref->pyMode();
+      pz = ref->pzMode();
+      eta = ref->etaMode();
+      etaerror = ref->etaModeError();
+      phi = ref->phiMode();
+      phierror = ref->phiModeError();
+      energy = ref->pMode();
+
       const auto& vec = orig2->Pin();
-      pt = vec.pt();
-      px = vec.px();
-      py = vec.py();
-      pz = vec.pz();
-      eta = vec.eta();
-      phi = vec.phi();
-      energy = vec.energy();
+      eta_ecal = vec.eta();
+      phi_ecal = vec.phi();
 
       const auto& vec2 = orig2->Pout();
-      eta_ecal = vec2.eta();
-      phi_ecal = vec2.phi();
+      eta_hcal = vec2.eta();
+      phi_hcal = vec2.phi();
 
       if (!orig2->GsftrackRefPF().isNull()) {
         charge = orig2->GsftrackRefPF()->charge();
         num_hits = orig2->GsftrackRefPF()->PFRecBrem().size();
       }
 
-      const auto& ref = orig2->GsftrackRef();
+      lambda = ref->lambdaMode();
+      lambdaerror = ref->lambdaModeError();
+      theta = ref->thetaMode();
+      thetaerror = ref->thetaModeError();
+      vx = ref->vx();
+      vy = ref->vy();
+      vz = ref->vz();
+
+      //Find the GSF electron that corresponds to this GSF track
+      for (const auto& gsfEle : gsfElectrons) {
+        if (ref == gsfEle.gsfTrack()) {
+          gsf_electronseed_dnn1 = gsfEle.dnn_signal_Isolated();
+          gsf_electronseed_dnn2 = gsfEle.dnn_signal_nonIsolated();
+          gsf_electronseed_dnn3 = gsfEle.dnn_bkg_nonIsolated();
+          gsf_electronseed_dnn4 = gsfEle.dnn_bkg_Tau();
+          gsf_electronseed_dnn5 = gsfEle.dnn_bkg_Photon();
+          break;
+        }
+      }
 
       const auto& gsfextraref = ref->extra();
       if (gsfextraref.isAvailable() && gsfextraref->seedRef().isAvailable()) {
@@ -155,13 +209,28 @@ namespace reco::mlpf {
         pz = ref->position().z();
         energy = ref->energy();
         corr_energy = ref->correctedEnergy();
+        corr_energy_err = ref->correctedEnergyUncertainty();
         layer = ref->layer();
         depth = ref->depth();
         num_hits = ref->recHitFractions().size();
+        vx = ref->vx();
+        vy = ref->vy();
+        vz = ref->vz();
       }
     } else if (type == reco::PFBlockElement::SC) {
       const auto& clref = ((const reco::PFBlockElementSuperCluster*)&orig)->superClusterRef();
       if (clref.isNonnull()) {
+        //Find the GSF electron that corresponds to this SC
+        for (const auto& gsfEle : gsfElectrons) {
+          if (clref == gsfEle.superCluster()) {
+            gsf_electronseed_dnn1 = gsfEle.dnn_signal_Isolated();
+            gsf_electronseed_dnn2 = gsfEle.dnn_signal_nonIsolated();
+            gsf_electronseed_dnn3 = gsfEle.dnn_bkg_nonIsolated();
+            gsf_electronseed_dnn4 = gsfEle.dnn_bkg_Tau();
+            gsf_electronseed_dnn5 = gsfEle.dnn_bkg_Photon();
+            break;
+          }
+        }
         cluster_flags = clref->flags();
         eta = clref->eta();
         phi = clref->phi();
@@ -169,38 +238,57 @@ namespace reco::mlpf {
         py = clref->position().y();
         pz = clref->position().z();
         energy = clref->energy();
+        corr_energy = clref->preshowerEnergy();
         num_hits = clref->clustersSize();
+        etaerror = clref->etaWidth();
+        phierror = clref->phiWidth();
       }
     }
 
-    float typ_idx = static_cast<float>(elem_type_encoding.at(orig.type()));
+    ElementFeatures ret;
+    ret.type = static_cast<float>(orig.type());
+    ret.pt = pt;
+    ret.eta = eta;
+    ret.phi = phi;
+    ret.energy = energy;
+    ret.layer = layer;
+    ret.depth = depth;
+    ret.charge = charge;
+    ret.trajpoint = trajpoint;
+    ret.eta_ecal = eta_ecal;
+    ret.phi_ecal = phi_ecal;
+    ret.eta_hcal = eta_hcal;
+    ret.phi_hcal = phi_hcal;
+    ret.muon_dt_hits = muon_dt_hits;
+    ret.muon_csc_hits = muon_csc_hits;
+    ret.muon_type = muon_type;
+    ret.px = px;
+    ret.py = py;
+    ret.pz = pz;
+    ret.deltap = deltap;
+    ret.sigmadeltap = sigmadeltap;
+    ret.gsf_electronseed_trkorecal = gsf_electronseed_trkorecal;
+    ret.gsf_electronseed_dnn1 = gsf_electronseed_dnn1;
+    ret.gsf_electronseed_dnn2 = gsf_electronseed_dnn2;
+    ret.gsf_electronseed_dnn3 = gsf_electronseed_dnn3;
+    ret.gsf_electronseed_dnn4 = gsf_electronseed_dnn4;
+    ret.gsf_electronseed_dnn5 = gsf_electronseed_dnn5;
+    ret.num_hits = num_hits;
+    ret.cluster_flags = cluster_flags;
+    ret.corr_energy = corr_energy;
+    ret.corr_energy_err = corr_energy_err;
+    ret.vx = vx;
+    ret.vy = vy;
+    ret.vz = vz;
+    ret.pterror = pterror;
+    ret.etaerror = etaerror;
+    ret.phierror = phierror;
+    ret.lambda = lambda;
+    ret.lambdaerror = lambdaerror;
+    ret.theta = theta;
+    ret.thetaerror = thetaerror;
 
-    //Must be the same order as in tf_model.py
-    return {{typ_idx,
-             pt,
-             eta,
-             phi,
-             energy,
-             layer,
-             depth,
-             charge,
-             trajpoint,
-             eta_ecal,
-             phi_ecal,
-             eta_hcal,
-             phi_hcal,
-             muon_dt_hits,
-             muon_csc_hits,
-             muon_type,
-             px,
-             py,
-             pz,
-             deltap,
-             sigmadeltap,
-             gsf_electronseed_trkorecal,
-             num_hits,
-             cluster_flags,
-             corr_energy}};
+    return ret;
   }
 
   //to make sure DNN inputs are within numerical bounds, use the same in training
@@ -271,7 +359,7 @@ namespace reco::mlpf {
           all_elements.push_back(&elem);
         } else {
           //model needs to be created with a bigger LSH codebook size
-          edm::LogError("MLPFProducer") << "too many input PFElements for predefined model size: " << elems.size();
+          edm::LogError("MLPFProducer") << "too many input PFElements for predefined model size:" << elems.size();
           break;
         }
       }
