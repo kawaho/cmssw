@@ -27,18 +27,22 @@ public:
 
 private:
   const edm::EDPutTokenT<reco::PFCandidateCollection> pfCandidatesPutToken_;
+  const edm::EDGetTokenT<edm::View<reco::GsfElectron>> gsfElectrons_;
   const edm::EDGetTokenT<reco::PFBlockCollection> inputTagBlocks_;
 };
 
 MLPFProducer::MLPFProducer(const edm::ParameterSet& cfg, const ONNXRuntime* cache)
     : pfCandidatesPutToken_{produces<reco::PFCandidateCollection>()},
-      inputTagBlocks_(consumes<reco::PFBlockCollection>(cfg.getParameter<edm::InputTag>("src"))) {}
+      gsfElectrons_{consumes<edm::View<reco::GsfElectron>>(edm::InputTag("gedGsfElectronsTmp"))},
+      inputTagBlocks_{consumes<reco::PFBlockCollection>(cfg.getParameter<edm::InputTag>("src"))} {}
 
 void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
   using namespace reco::mlpf;
 
   const auto& blocks = event.get(inputTagBlocks_);
   const auto& all_elements = getPFElements(blocks);
+
+  const auto& gsfElectrons = event.get(gsfElectrons_);
 
   std::vector<const reco::PFBlockElement*> selected_elements;
   unsigned int num_elements_total = 0;
@@ -73,7 +77,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     const auto& elem = *pelem;
 
     //prepare the input array from the PFElement
-    const auto& props = getElementProperties(elem);
+    const auto& props = getElementProperties(elem, gsfElectrons).as_array();
 
     //copy features to the input array
     for (unsigned int iprop = 0; iprop < NUM_ELEMENT_FEATURES; iprop++) {
@@ -105,7 +109,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     auto imax = argMax(pred_id_probas);
 
     //get the most probable class PDGID
-    int pred_pid = pdgid_encoding[imax];
+    int pred_pid = pdgid_encoding.at(imax);
 
 #ifdef MLPF_DEBUG
     std::cout << "ielem=" << ielem << " inputs:";
@@ -168,11 +172,9 @@ void MLPFProducer::globalEndJob(const ONNXRuntime* cache) {}
 void MLPFProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<edm::InputTag>("src", edm::InputTag("particleFlowBlock"));
-  desc.add<edm::FileInPath>(
-      "model_path",
-      edm::FileInPath(
-          "RecoParticleFlow/PFProducer/data/mlpf/"
-          "mlpf_2021_11_16__no_einsum__all_data_cms-best-of-asha-scikit_20211026_042043_178263.workergpu010.onnx"));
+  desc.add<edm::FileInPath>("model_path",
+                            edm::FileInPath("RecoParticleFlow/PFProducer/data/mlpf/"
+                                            "dev.onnx"));
   descriptions.addWithDefaultLabel(desc);
 }
 
