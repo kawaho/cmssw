@@ -7,6 +7,7 @@
 
 namespace reco::mlpf {
 
+  //The model takes the following number of features for each input PFElement
   static constexpr unsigned int NUM_ELEMENT_FEATURES = 41;
 
   struct ElementFeatures {
@@ -97,12 +98,11 @@ namespace reco::mlpf {
     }
   };
 
-  //The model takes the following number of features for each input PFElement
-  static constexpr unsigned int NUM_OUTPUT_FEATURES = 14;
+  static constexpr unsigned int NUM_OUTPUT_FEATURES = 15;
 
   //these are defined at model creation time and set the random LSH codebook size
-  static constexpr int LSH_BIN_SIZE = 64;
-  static constexpr int NUM_MAX_ELEMENTS_BATCH = 200 * LSH_BIN_SIZE;
+  static constexpr int LSH_BIN_SIZE = 32;
+  static constexpr int NUM_MAX_ELEMENTS_BATCH = 400 * LSH_BIN_SIZE;
 
   //In CPU mode, we want to evaluate each event separately
   static constexpr int BATCH_SIZE = 1;
@@ -115,22 +115,22 @@ namespace reco::mlpf {
   // out[11]: regressed sin phi
   // out[12]: regressed cos phi
   // out[13]: regressed energy
-  static constexpr unsigned int IDX_CLASS = 7;
+  static constexpr unsigned int IDX_CLASS = 8;
 
-  static constexpr unsigned int IDX_CHARGE = 8;
+  static constexpr unsigned int IDX_CHARGE = IDX_CLASS+1;
 
-  static constexpr unsigned int IDX_PT = 9;
-  static constexpr unsigned int IDX_ETA = 10;
-  static constexpr unsigned int IDX_SIN_PHI = 11;
-  static constexpr unsigned int IDX_COS_PHI = 12;
-  static constexpr unsigned int IDX_ENERGY = 13;
+  static constexpr unsigned int IDX_PT = IDX_CLASS+2;
+  static constexpr unsigned int IDX_ETA = IDX_CLASS+3;
+  static constexpr unsigned int IDX_SIN_PHI = IDX_CLASS+4;
+  static constexpr unsigned int IDX_COS_PHI = IDX_CLASS+5;
+  static constexpr unsigned int IDX_ENERGY = IDX_CLASS+6;
 
   //for consistency with the baseline PFAlgo
   static constexpr float PI_MASS = 0.13957;
 
   //index [0, N_pdgids) -> PDGID
   //this maps the absolute values of the predicted PDGIDs to an array of ascending indices
-  static const std::vector<int> pdgid_encoding = {0, 211, 130, 1, 2, 22, 11, 13};
+  static const std::vector<int> pdgid_encoding = {0, 211, 130, 1, 2, 22, 11, 13, 15};
 
   //PFElement::type -> index [0, N_types)
   //this maps the type of the PFElement to an ascending index that is used by the model to distinguish between different elements

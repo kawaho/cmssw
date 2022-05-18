@@ -826,7 +826,6 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   for (size_t ielem = 0; ielem < all_elements.size(); ielem++) {
     const auto& elem = all_elements.at(ielem);
     const auto& orig = elem.orig;
-    reco::PFBlockElement::Type type = orig.type();
 
     const auto& found = pfcluster_to_rechit.find(ielem);
     if (found != pfcluster_to_rechit.end()) {
