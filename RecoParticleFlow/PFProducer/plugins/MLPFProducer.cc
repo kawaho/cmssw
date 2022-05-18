@@ -47,7 +47,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
   std::vector<const reco::PFBlockElement*> selected_elements;
   unsigned int num_elements_total = 0;
   for (const auto* pelem : all_elements) {
-    if (pelem->type() == reco::PFBlockElement::PS1 || pelem->type() == reco::PFBlockElement::PS2) {
+    if (pelem->type() == reco::PFBlockElement::PS1 || pelem->type() == reco::PFBlockElement::PS2 || pelem->type() == reco::PFBlockElement::BREM) {
       continue;
     }
     num_elements_total += 1;
@@ -117,7 +117,6 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
       std::cout << iprop << "=" << inputs[0][ielem * NUM_ELEMENT_FEATURES + iprop] << " ";
     }
     std::cout << std::endl;
-    std::cout << "ielem=" << ielem << " pred: pid=" << pred_pid << std::endl;
 #endif
 
     //a particle was predicted for this PFElement, otherwise it was a spectator
@@ -154,7 +153,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
       pOutputCandidateCollection.push_back(cand);
 
 #ifdef MLPF_DEBUG
-      std::cout << "ielem=" << ielem << " cand: pid=" << cand.pdgId() << " E=" << cand.energy() << " pt=" << cand.pt()
+      std::cout << "ielem=" << ielem << " pred: pid=" << cand.pdgId() << " E=" << cand.energy() << " pt=" << cand.pt()
                 << " eta=" << cand.eta() << " phi=" << cand.phi() << " charge=" << cand.charge() << std::endl;
 #endif
     }
