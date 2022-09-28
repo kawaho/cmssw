@@ -12,7 +12,7 @@
 using namespace cms::Ort;
 
 //use this to switch on detailed print statements in MLPF
-//#define MLPF_DEBUG
+#define MLPF_DEBUG
 
 class MLPFProducer : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>> {
 public:
@@ -95,10 +95,10 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
   std::vector<reco::PFCandidate> pOutputCandidateCollection;
   for (size_t ielem = 0; ielem < num_elements_total; ielem++) {
-    std::vector<float> pred_id_probas(IDX_CLASS + 1, 0.0);
+    std::vector<float> pred_id_probas(pdgid_encoding.size(), 0.0);
     const reco::PFBlockElement* elem = selected_elements[ielem];
 
-    for (unsigned int idx_id = 0; idx_id <= IDX_CLASS; idx_id++) {
+    for (unsigned int idx_id = 0; idx_id < pred_id_probas.size(); idx_id++) {
       auto pred_proba = output[ielem * NUM_OUTPUT_FEATURES + idx_id];
 #ifdef MLPF_DEBUG
       assert(!std::isnan(pred_proba));
