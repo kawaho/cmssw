@@ -59,4 +59,26 @@ def customize_step3(process):
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoGsfTracks_*_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoPFBlocks_*_*_*')
 
+    process.load("SimTracker.TrackerHitAssociation.tpClusterProducer_cfi")
+    process.load("SimTracker.TrackAssociatorProducers.quickTrackAssociatorByHits_cfi")
+    process.load("SimTracker.TrackAssociatorProducers.trackAssociatorByHits_cfi")
+    process.load("SimTracker.TrackAssociation.trackingParticleRecoTrackAsssociation_cfi")
+      
+    process.trackingParticleGsfTrackAssociation = process.trackingParticleRecoTrackAsssociation.clone(label_tr="electronGsfTracks")
+    
+    process.pfana = cms.EDAnalyzer('PFAnalysis')
+    
+    process.TFileService = cms.Service("TFileService",
+        fileName = cms.string("pfntuple.root")
+    )
+    
+    process.pfana_path = cms.Path(
+      process.tpClusterProducer*
+      process.quickTrackAssociatorByHits*
+      process.trackingParticleRecoTrackAsssociation*
+      process.trackingParticleGsfTrackAssociation*
+      process.pfana)
+    
+    process.schedule.append(process.pfana_path)
+
     return process
