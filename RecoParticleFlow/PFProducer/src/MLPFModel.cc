@@ -10,6 +10,7 @@
 #include "DataFormats/ParticleFlowReco/interface/PFBlockElementCluster.h"
 #include "DataFormats/EgammaReco/interface/SuperCluster.h"
 #include "DataFormats/EgammaReco/interface/ElectronSeed.h"
+#include "TMath.h"
 
 namespace reco::mlpf {
 
@@ -25,6 +26,9 @@ namespace reco::mlpf {
     float px = 0.0;
     float py = 0.0;
     float pz = 0.0;
+    float sigma_x = 0.0;
+    float sigma_y = 0.0;
+    float sigma_z = 0.0;
     float eta = 0.0;
     float etaerror = 0.0;
     float phi = 0.0;
@@ -58,6 +62,8 @@ namespace reco::mlpf {
     float gsf_electronseed_dnn4 = 0.0;
     float gsf_electronseed_dnn5 = 0.0;
     float num_hits = 0.0;
+    float time = 0.0;
+    float timeerror = 0.0;
 
     if (type == reco::PFBlockElement::TRACK) {
       const auto& matched_pftrack = orig.trackRefPF();
@@ -216,7 +222,39 @@ namespace reco::mlpf {
         vx = ref->vx();
         vy = ref->vy();
         vz = ref->vz();
-      }
+
+        time = ref->time();
+        timeerror = ref->timeError();
+       
+        std::vector<double> hitE(ref->recHitFractions().size(), 0.0);
+        std::vector<double> posEta(ref->recHitFractions().size(), 0.0);
+        std::vector<double> posPhi(ref->recHitFractions().size(), 0.0);
+        std::vector<double> posX(ref->recHitFractions().size(), 0.0);
+        std::vector<double> posY(ref->recHitFractions().size(), 0.0);
+        std::vector<double> posZ(ref->recHitFractions().size(), 0.0);
+
+        const std::vector<reco::PFRecHitFraction>& PFRecHits = ref->recHitFractions();
+        unsigned int ihit = 0;
+        for (std::vector<reco::PFRecHitFraction>::const_iterator it = PFRecHits.begin(); it != PFRecHits.end(); ++it) {
+          const PFRecHitRef& RefPFRecHit = it->recHitRef();
+          double energyHit = RefPFRecHit->energy() * it->fraction();
+          hitE[ihit] = energyHit;
+          posX[ihit] = RefPFRecHit->position().x();
+          posY[ihit] = RefPFRecHit->position().y();
+          posZ[ihit] = RefPFRecHit->position().z();
+          posEta[ihit] = RefPFRecHit->position().eta();
+          posPhi[ihit] = RefPFRecHit->position().phi();
+          ihit++;
+        }
+        if (ref->recHitFractions().size() > 1) {
+          sigma_x = TMath::StdDev(posX.begin(), posX.end(), hitE.begin());
+          sigma_y = TMath::StdDev(posY.begin(), posY.end(), hitE.begin());
+          sigma_z = TMath::StdDev(posZ.begin(), posZ.end(), hitE.begin());
+          pterror = TMath::StdDev(hitE.begin(), hitE.end());
+          etaerror = TMath::StdDev(posEta.begin(), posEta.end());
+          phierror = TMath::StdDev(posPhi.begin(), posPhi.end()); //NB: this does not correctly account for modular phi at the moment
+        }
+      } 
     } else if (type == reco::PFBlockElement::SC) {
       const auto& clref = ((const reco::PFBlockElementSuperCluster*)&orig)->superClusterRef();
       if (clref.isNonnull()) {
@@ -265,6 +303,9 @@ namespace reco::mlpf {
     ret.px = px;
     ret.py = py;
     ret.pz = pz;
+    ret.sigma_x = sigma_x;
+    ret.sigma_y = sigma_y;
+    ret.sigma_z = sigma_z;
     ret.deltap = deltap;
     ret.sigmadeltap = sigmadeltap;
     ret.gsf_electronseed_trkorecal = gsf_electronseed_trkorecal;
@@ -287,6 +328,8 @@ namespace reco::mlpf {
     ret.lambdaerror = lambdaerror;
     ret.theta = theta;
     ret.thetaerror = thetaerror;
+    ret.time = time;
+    ret.timeerror = timeerror;
 
     return ret;
   }

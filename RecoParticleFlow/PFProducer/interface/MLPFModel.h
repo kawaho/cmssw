@@ -30,6 +30,9 @@ namespace reco::mlpf {
     float px;
     float py;
     float pz;
+    float sigma_x;
+    float sigma_y;
+    float sigma_z;
     float deltap;
     float sigmadeltap;
     float gsf_electronseed_trkorecal;
@@ -52,7 +55,10 @@ namespace reco::mlpf {
     float lambdaerror;
     float theta;
     float thetaerror;
+    float time;
+    float timeerror;
 
+    // MLPF features in 2022
     std::array<float, NUM_ELEMENT_FEATURES> as_array() {
       return {{type,
                pt,

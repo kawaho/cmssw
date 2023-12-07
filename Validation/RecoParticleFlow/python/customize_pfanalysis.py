@@ -49,6 +49,7 @@ def customize_step3(process):
     process.FEVTDEBUGHLToutput.outputCommands.append('keep *_*_MergedTrackTruth_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoPFRecTracks_*_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoPFRecHits_*_*_*')
+    process.FEVTDEBUGHLToutput.outputCommands.append('keep recoPFRecHitFractions_*_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoGsfPFRecTracks_*_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep *_particleFlowBlock_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoTracks_standAloneMuons_*_*')
