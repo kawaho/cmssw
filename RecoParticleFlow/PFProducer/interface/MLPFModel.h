@@ -57,6 +57,14 @@ namespace reco::mlpf {
     float thetaerror;
     float time;
     float timeerror;
+    float etaerror1;
+    float phierror1;
+    float etaerror2;
+    float phierror2;
+    float etaerror3;
+    float phierror3;
+    float etaerror4;
+    float phierror4;
 
     // MLPF features in 2022
     std::array<float, NUM_ELEMENT_FEATURES> as_array() {

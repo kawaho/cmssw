@@ -64,6 +64,14 @@ namespace reco::mlpf {
     float num_hits = 0.0;
     float time = 0.0;
     float timeerror = 0.0;
+    float etaerror1 = 0.0;
+    float phierror1 = 0.0;
+    float etaerror2 = 0.0;
+    float phierror2 = 0.0;
+    float etaerror3 = 0.0;
+    float phierror3 = 0.0;
+    float etaerror4 = 0.0;
+    float phierror4 = 0.0;
 
     if (type == reco::PFBlockElement::TRACK) {
       const auto& matched_pftrack = orig.trackRefPF();
@@ -232,6 +240,20 @@ namespace reco::mlpf {
         std::vector<double> posX(ref->recHitFractions().size(), 0.0);
         std::vector<double> posY(ref->recHitFractions().size(), 0.0);
         std::vector<double> posZ(ref->recHitFractions().size(), 0.0);
+        std::vector<double> depths(ref->recHitFractions().size(), 0.0);
+        
+        std::vector<double> depth1_hitE;
+        std::vector<double> depth1_posEta;
+        std::vector<double> depth1_posPhi;
+        std::vector<double> depth2_hitE;
+        std::vector<double> depth2_posEta;
+        std::vector<double> depth2_posPhi;
+        std::vector<double> depth3_hitE;
+        std::vector<double> depth3_posEta;
+        std::vector<double> depth3_posPhi;
+        std::vector<double> depth4_hitE;
+        std::vector<double> depth4_posEta;
+        std::vector<double> depth4_posPhi;
 
         const std::vector<reco::PFRecHitFraction>& PFRecHits = ref->recHitFractions();
         unsigned int ihit = 0;
@@ -243,7 +265,30 @@ namespace reco::mlpf {
           posY[ihit] = RefPFRecHit->position().y();
           posZ[ihit] = RefPFRecHit->position().z();
           posEta[ihit] = RefPFRecHit->position().eta();
-          posPhi[ihit] = RefPFRecHit->position().phi();
+          posPhi[ihit] = deltaPhi(RefPFRecHit->position().phi(), ref->phi());
+          depths[ihit] = RefPFRecHit->depth();
+
+          if (depths[ihit] == 1) {
+            depth1_hitE.push_back(hitE[ihit]);
+            depth1_posEta.push_back(posEta[ihit]);
+            depth1_posPhi.push_back(posPhi[ihit]);
+          }
+          else if (depths[ihit] == 2) {
+            depth2_hitE.push_back(hitE[ihit]);
+            depth2_posEta.push_back(posEta[ihit]);
+            depth2_posPhi.push_back(posPhi[ihit]);
+          }
+          else if (depths[ihit] == 3) {
+            depth3_hitE.push_back(hitE[ihit]);
+            depth3_posEta.push_back(posEta[ihit]);
+            depth3_posPhi.push_back(posPhi[ihit]);
+          }
+          else {
+            depth4_hitE.push_back(hitE[ihit]);
+            depth4_posEta.push_back(posEta[ihit]);
+            depth4_posPhi.push_back(posPhi[ihit]);
+          }
+
           ihit++;
         }
         if (ref->recHitFractions().size() > 1) {
@@ -252,7 +297,23 @@ namespace reco::mlpf {
           sigma_z = TMath::StdDev(posZ.begin(), posZ.end(), hitE.begin());
           pterror = TMath::StdDev(hitE.begin(), hitE.end());
           etaerror = TMath::StdDev(posEta.begin(), posEta.end());
-          phierror = TMath::StdDev(posPhi.begin(), posPhi.end()); //NB: this does not correctly account for modular phi at the moment
+          phierror = TMath::StdDev(posPhi.begin(), posPhi.end());
+        }
+        if (depth1_hitE.size() > 1) {
+          etaerror1 = TMath::StdDev(depth1_posEta.begin(), depth1_posEta.end(), depth1_hitE.begin());
+          phierror1 = TMath::StdDev(depth1_posPhi.begin(), depth1_posPhi.end(), depth1_hitE.begin());
+        }
+        if (depth2_hitE.size() > 1) {
+          etaerror2 = TMath::StdDev(depth2_posEta.begin(), depth2_posEta.end(), depth2_hitE.begin());
+          phierror2 = TMath::StdDev(depth2_posPhi.begin(), depth2_posPhi.end(), depth2_hitE.begin());
+        }
+        if (depth3_hitE.size() > 1) {
+          etaerror3 = TMath::StdDev(depth3_posEta.begin(), depth3_posEta.end(), depth3_hitE.begin());
+          phierror3 = TMath::StdDev(depth3_posPhi.begin(), depth3_posPhi.end(), depth3_hitE.begin());
+        }
+        if (depth4_hitE.size() > 1) {
+          etaerror4 = TMath::StdDev(depth4_posEta.begin(), depth4_posEta.end(), depth4_hitE.begin());
+          phierror4 = TMath::StdDev(depth4_posPhi.begin(), depth4_posPhi.end(), depth4_hitE.begin());
         }
       } 
     } else if (type == reco::PFBlockElement::SC) {
@@ -330,6 +391,14 @@ namespace reco::mlpf {
     ret.thetaerror = thetaerror;
     ret.time = time;
     ret.timeerror = timeerror;
+    ret.etaerror1 = etaerror1;
+    ret.phierror1 = phierror1;
+    ret.etaerror2 = etaerror2;
+    ret.phierror2 = phierror2;
+    ret.etaerror3 = etaerror3;
+    ret.phierror3 = phierror3;
+    ret.etaerror4 = etaerror4;
+    ret.phierror4 = phierror4;
 
     return ret;
   }

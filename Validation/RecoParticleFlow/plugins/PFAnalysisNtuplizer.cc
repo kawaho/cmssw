@@ -215,6 +215,9 @@ private:
   vector<float> element_px_;
   vector<float> element_py_;
   vector<float> element_pz_;
+  vector<float> element_sigma_x_;
+  vector<float> element_sigma_y_;
+  vector<float> element_sigma_z_;
   vector<float> element_deltap_;
   vector<float> element_sigmadeltap_;
   vector<float> element_eta_;
@@ -251,6 +254,16 @@ private:
   vector<float> element_vx_;
   vector<float> element_vy_;
   vector<float> element_vz_;
+  vector<float> element_time_;
+  vector<float> element_timeerror_;
+  vector<float> element_etaerror1_;
+  vector<float> element_etaerror2_;
+  vector<float> element_etaerror3_;
+  vector<float> element_etaerror4_;
+  vector<float> element_phierror1_;
+  vector<float> element_phierror2_;
+  vector<float> element_phierror3_;
+  vector<float> element_phierror4_;
 
   vector<int> element_distance_i_;
   vector<int> element_distance_j_;
@@ -386,6 +399,9 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("element_px", &element_px_);
   t_->Branch("element_py", &element_py_);
   t_->Branch("element_pz", &element_pz_);
+  t_->Branch("element_sigma_x", &element_sigma_x_);
+  t_->Branch("element_sigma_y", &element_sigma_y_);
+  t_->Branch("element_sigma_z", &element_sigma_z_);
   t_->Branch("element_deltap", &element_deltap_);
   t_->Branch("element_sigmadeltap", &element_sigmadeltap_);
   t_->Branch("element_eta", &element_eta_);
@@ -422,6 +438,16 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("element_vx", &element_vx_);
   t_->Branch("element_vy", &element_vy_);
   t_->Branch("element_vz", &element_vz_);
+  t_->Branch("element_time", &element_time_);
+  t_->Branch("element_timeerror", &element_timeerror_);
+  t_->Branch("element_etaerror1", &element_etaerror1_);
+  t_->Branch("element_etaerror2", &element_etaerror2_);
+  t_->Branch("element_etaerror3", &element_etaerror3_);
+  t_->Branch("element_etaerror4", &element_etaerror4_);
+  t_->Branch("element_phierror1", &element_phierror1_);
+  t_->Branch("element_phierror2", &element_phierror2_);
+  t_->Branch("element_phierror3", &element_phierror3_);
+  t_->Branch("element_phierror4", &element_phierror4_);
 
   //Distance matrix between PF elements
   t_->Branch("element_distance_i", &element_distance_i_);
@@ -551,6 +577,9 @@ void PFAnalysis::clearVariables() {
   element_px_.clear();
   element_py_.clear();
   element_pz_.clear();
+  element_sigma_x_.clear();
+  element_sigma_y_.clear();
+  element_sigma_z_.clear();
   element_deltap_.clear();
   element_sigmadeltap_.clear();
   element_eta_.clear();
@@ -587,6 +616,16 @@ void PFAnalysis::clearVariables() {
   element_vx_.clear();
   element_vy_.clear();
   element_vz_.clear();
+  element_time_.clear();
+  element_timeerror_.clear();
+  element_etaerror1_.clear();
+  element_etaerror2_.clear();
+  element_etaerror3_.clear();
+  element_etaerror4_.clear();
+  element_phierror1_.clear();
+  element_phierror2_.clear();
+  element_phierror3_.clear();
+  element_phierror4_.clear();
 
   element_distance_i_.clear();
   element_distance_j_.clear();
@@ -851,6 +890,9 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     element_px_.push_back(props.px);
     element_py_.push_back(props.py);
     element_pz_.push_back(props.pz);
+    element_sigma_x_.push_back(props.sigma_x);
+    element_sigma_y_.push_back(props.sigma_y);
+    element_sigma_z_.push_back(props.sigma_z);
     element_deltap_.push_back(props.deltap);
     element_sigmadeltap_.push_back(props.sigmadeltap);
     element_eta_.push_back(props.eta);
@@ -887,6 +929,16 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     element_vx_.push_back(props.vx);
     element_vy_.push_back(props.vy);
     element_vz_.push_back(props.vz);
+    element_time_.push_back(props.time);
+    element_timeerror_.push_back(props.timeerror);
+    element_etaerror1_.push_back(props.etaerror1);
+    element_etaerror2_.push_back(props.etaerror2);
+    element_etaerror3_.push_back(props.etaerror3);
+    element_etaerror4_.push_back(props.etaerror4);
+    element_phierror1_.push_back(props.phierror1);
+    element_phierror2_.push_back(props.phierror2);
+    element_phierror3_.push_back(props.phierror3);
+    element_phierror4_.push_back(props.phierror4);
   }  //all_elements
 
   //fill caloparticle_to_element
