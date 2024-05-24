@@ -8,7 +8,7 @@
 namespace reco::mlpf {
 
   //The model takes the following number of features for each input PFElement
-  static constexpr unsigned int NUM_ELEMENT_FEATURES = 41;
+  static constexpr unsigned int NUM_ELEMENT_FEATURES = 51;
 
   struct ElementFeatures {
     float type;
@@ -66,7 +66,7 @@ namespace reco::mlpf {
     float etaerror4;
     float phierror4;
 
-    // MLPF features in 2022
+    // MLPF features in 2024
     std::array<float, NUM_ELEMENT_FEATURES> as_array() {
       return {{type,
                pt,
@@ -108,7 +108,17 @@ namespace reco::mlpf {
                lambda,
                lambdaerror,
                theta,
-               thetaerror}};
+               thetaerror,
+               time,
+               timeerror,
+               etaerror1,
+               etaerror2,
+               etaerror3,
+               etaerror4,
+               phierror1,
+               phierror2,
+               phierror3,
+               phierror4}};
     }
   };
 
