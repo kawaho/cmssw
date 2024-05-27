@@ -12,7 +12,7 @@
 using namespace cms::Ort;
 
 //use this to switch on detailed print statements in MLPF
-//#define MLPF_DEBUG
+#define MLPF_DEBUG
 
 class MLPFProducer : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>> {
 public:
@@ -67,7 +67,9 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 #endif
 
   //Fill the input tensor (batch, elems, features) = (1, tensor_size, NUM_ELEMENT_FEATURES)
-  std::vector<std::vector<float>> inputs(1, std::vector<float>(NUM_ELEMENT_FEATURES * tensor_size, 0.0));
+  std::vector<std::vector<float>> inputs;
+  inputs.push_back(std::vector<float>(NUM_ELEMENT_FEATURES * tensor_size, 0.0));
+  inputs.push_back(std::vector<float>(tensor_size, 0.0));
   unsigned int ielem = 0;
   for (const auto* pelem : selected_elements) {
     if (ielem > tensor_size) {
@@ -83,14 +85,20 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     for (unsigned int iprop = 0; iprop < NUM_ELEMENT_FEATURES; iprop++) {
       inputs[0][ielem * NUM_ELEMENT_FEATURES + iprop] = normalize(props[iprop]);
     }
+    //mask
+    inputs[1][ielem] = 1.0;
     ielem += 1;
   }
 
   //run the GNN inference, given the inputs and the output.
-  const auto& outputs = globalCache()->run({"x:0"}, inputs, {{1, tensor_size, NUM_ELEMENT_FEATURES}});
-  const auto& output = outputs[0];
+  const auto& outputs = globalCache()->run({"Xfeat_normed", "mask"}, inputs, {{1, tensor_size, NUM_ELEMENT_FEATURES}, {1, tensor_size}});
+  const auto& output_id = outputs[0];
+  const auto& output_p4 = outputs[1];
 #ifdef MLPF_DEBUG
-  assert(output.size() == tensor_size * NUM_OUTPUT_FEATURES);
+  std::cout << "output_id=" << output_id.size() << std::endl;  
+  assert(output_id.size() == tensor_size * NUM_OUTPUT_FEATURES_CLS);
+  std::cout << "output_p4=" << output_p4.size() << std::endl;  
+  assert(output_p4.size() == tensor_size * NUM_OUTPUT_FEATURES_P4);
 #endif
 
   std::vector<reco::PFCandidate> pOutputCandidateCollection;
@@ -99,7 +107,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     const reco::PFBlockElement* elem = selected_elements[ielem];
 
     for (unsigned int idx_id = 0; idx_id < pred_id_probas.size(); idx_id++) {
-      auto pred_proba = output[ielem * NUM_OUTPUT_FEATURES + idx_id];
+      auto pred_proba = output_id[ielem * NUM_OUTPUT_FEATURES_CLS + idx_id];
 #ifdef MLPF_DEBUG
       assert(!std::isnan(pred_proba));
 #endif
@@ -126,11 +134,21 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
         pred_pid = 130;
       }
 
+      float pred_charge = 0.0;
       if (elem->type() == reco::PFBlockElement::TRACK) {
         const auto* eltTrack = dynamic_cast<const reco::PFBlockElementTrack*>(elem);
+	//for now, just take the charge from the track
+	if (eltTrack->trackRef().isNonnull()) {
+          pred_charge = eltTrack->trackRef()->charge();
+        }
 
-        //a track with no muon ref should not produce a muon candidate, instead we interpret it as a charged hadron
+        //a track with no muon ref should not produce a muon candidate, instead we interpret it as a charged hadron here
         if (pred_pid == 13 && eltTrack->muonRef().isNull()) {
+          pred_pid = 211;
+        }
+       
+        //taus are reconstructed downstream based on other criteria, instead we interpret it as a charged hadron here
+	if (pred_pid == 15) {
           pred_pid = 211;
         }
 
@@ -140,13 +158,12 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
         }
       }
 
-      //get the predicted momentum components
-      float pred_pt = output[ielem * NUM_OUTPUT_FEATURES + IDX_PT];
-      float pred_eta = output[ielem * NUM_OUTPUT_FEATURES + IDX_ETA];
-      float pred_sin_phi = output[ielem * NUM_OUTPUT_FEATURES + IDX_SIN_PHI];
-      float pred_cos_phi = output[ielem * NUM_OUTPUT_FEATURES + IDX_COS_PHI];
-      float pred_e = output[ielem * NUM_OUTPUT_FEATURES + IDX_ENERGY];
-      float pred_charge = output[ielem * NUM_OUTPUT_FEATURES + IDX_CHARGE];
+      //get the predicted momentum components from the model
+      float pred_pt = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_PT];
+      float pred_eta = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_ETA];
+      float pred_sin_phi = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_SIN_PHI];
+      float pred_cos_phi = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_COS_PHI];
+      float pred_e = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_ENERGY];
 
       auto cand = makeCandidate(pred_pid, pred_charge, pred_pt, pred_eta, pred_sin_phi, pred_cos_phi, pred_e);
       setCandidateRefs(cand, selected_elements, ielem);
@@ -173,7 +190,7 @@ void MLPFProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptions
   desc.add<edm::InputTag>("src", edm::InputTag("particleFlowBlock"));
   desc.add<edm::FileInPath>("model_path",
                             edm::FileInPath("RecoParticleFlow/PFProducer/data/mlpf/"
-                                            "dev.onnx"));
+                                            "test_fp32_fused.onnx"));
   descriptions.addWithDefaultLabel(desc);
 }
 

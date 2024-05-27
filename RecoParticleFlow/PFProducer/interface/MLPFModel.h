@@ -8,7 +8,7 @@
 namespace reco::mlpf {
 
   //The model takes the following number of features for each input PFElement
-  static constexpr unsigned int NUM_ELEMENT_FEATURES = 41;
+  static constexpr unsigned int NUM_ELEMENT_FEATURES = 55;
 
   struct ElementFeatures {
     float type;
@@ -66,12 +66,14 @@ namespace reco::mlpf {
     float etaerror4;
     float phierror4;
 
-    // MLPF features in 2022
+    // MLPF features in 2024
+    // from particleflow/mlpf/heptfds/cms_pf/utils.py
     std::array<float, NUM_ELEMENT_FEATURES> as_array() {
       return {{type,
                pt,
                eta,
-               phi,
+               std::sin(phi),
+               std::cos(phi),
                energy,
                layer,
                depth,
@@ -109,41 +111,44 @@ namespace reco::mlpf {
                lambdaerror,
                theta,
                thetaerror,
-//               time,
-//               timeerror,
-//               etaerror1,
-//               etaerror2,
-//               etaerror3,
-//               etaerror4,
-//               phierror1,
-//               phierror2,
-//               phierror3,
-//               phierror4
+               time,
+               timeerror,
+               etaerror1,
+               etaerror2,
+               etaerror3,
+               etaerror4,
+               phierror1,
+               phierror2,
+               phierror3,
+               phierror4,
+	       sigma_x,
+	       sigma_y,
+	       sigma_z,
         }};
     }
   };
 
-  static constexpr unsigned int NUM_OUTPUT_FEATURES = 14;
+  static constexpr unsigned int NUM_OUTPUT_FEATURES_CLS = 9;
+  static constexpr unsigned int NUM_OUTPUT_FEATURES_P4 = 5;
 
   //these are defined at model creation time and set the random LSH codebook size
-  static constexpr int LSH_BIN_SIZE = 100;
-  static constexpr int NUM_MAX_ELEMENTS_BATCH = 200 * LSH_BIN_SIZE;
+  static constexpr int LSH_BIN_SIZE = 256;
+  static constexpr int NUM_MAX_ELEMENTS_BATCH = 100 * LSH_BIN_SIZE;
 
   //In CPU mode, we want to evaluate each event separately
   static constexpr int BATCH_SIZE = 1;
 
   //index [0, N_pdgids) -> PDGID
   //this maps the absolute values of the predicted PDGIDs to an array of ascending indices
-  static constexpr std::array<int, 8> pdgid_encoding{{0, 211, 130, 1, 2, 22, 11, 13}};
+  static constexpr std::array<int, 9> pdgid_encoding{{0, 211, 130, 1, 2, 22, 11, 13, 15}};
   
   static constexpr unsigned int IDX_CLASS_LAST = pdgid_encoding.size()-1;
 
-  static constexpr unsigned int IDX_CHARGE = IDX_CLASS_LAST+1;
-  static constexpr unsigned int IDX_PT = IDX_CLASS_LAST+2;
-  static constexpr unsigned int IDX_ETA = IDX_CLASS_LAST+3;
-  static constexpr unsigned int IDX_SIN_PHI = IDX_CLASS_LAST+4;
-  static constexpr unsigned int IDX_COS_PHI = IDX_CLASS_LAST+5;
-  static constexpr unsigned int IDX_ENERGY = IDX_CLASS_LAST+6;
+  static constexpr unsigned int IDX_PT = 0;
+  static constexpr unsigned int IDX_ETA = 1;
+  static constexpr unsigned int IDX_SIN_PHI = 2;
+  static constexpr unsigned int IDX_COS_PHI = 3;
+  static constexpr unsigned int IDX_ENERGY = 4;
 
   //for consistency with the baseline PFAlgo
   static constexpr float PI_MASS = 0.13957;
