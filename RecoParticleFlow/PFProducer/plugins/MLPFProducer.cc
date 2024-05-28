@@ -12,7 +12,7 @@
 using namespace cms::Ort;
 
 //use this to switch on detailed print statements in MLPF
-#define MLPF_DEBUG
+//#define MLPF_DEBUG
 
 class MLPFProducer : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>> {
 public:
@@ -180,7 +180,8 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 }
 
 std::unique_ptr<ONNXRuntime> MLPFProducer::initializeGlobalCache(const edm::ParameterSet& params) {
-  return std::make_unique<ONNXRuntime>(params.getParameter<edm::FileInPath>("model_path").fullPath());
+  auto session_options = ONNXRuntime::defaultSessionOptions(params.getParameter<bool>("use_cuda") ? Backend::cuda : Backend::cpu);
+  return std::make_unique<ONNXRuntime>(params.getParameter<edm::FileInPath>("model_path").fullPath(), &session_options);
 }
 
 void MLPFProducer::globalEndJob(const ONNXRuntime* cache) {}
@@ -191,6 +192,7 @@ void MLPFProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptions
   desc.add<edm::FileInPath>("model_path",
                             edm::FileInPath("RecoParticleFlow/PFProducer/data/mlpf/"
                                             "test_fp32_fused.onnx"));
+  desc.add<bool>("use_cuda", false);
   descriptions.addWithDefaultLabel(desc);
 }
 
