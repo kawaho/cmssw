@@ -17,6 +17,8 @@
 #include "DataFormats/EgammaReco/interface/SuperCluster.h"
 #include "DataFormats/GsfTrackReco/interface/GsfTrack.h"
 #include "DataFormats/Math/interface/deltaPhi.h"
+#include "DataFormats/JetReco/interface/GenJet.h"
+#include "DataFormats/METReco/interface/GenMET.h"
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 #include "DataFormats/ParticleFlowReco/interface/PFBlock.h"
 #include "DataFormats/ParticleFlowReco/interface/PFBlockElementBrem.h"
@@ -117,6 +119,8 @@ private:
   edm::EDGetTokenT<reco::RecoToSimCollection> tracks_recotosim_;
   edm::EDGetTokenT<reco::RecoToSimCollection> gsf_recotosim_;
   edm::EDGetTokenT<edm::View<reco::GsfElectron>> gsfElectrons_;
+  edm::EDGetTokenT<edm::View<reco::GenJet>> genJets_;
+  edm::EDGetTokenT<edm::View<reco::GenMET>> genMETs_;
 
   TTree* t_;
 
@@ -210,6 +214,14 @@ private:
   vector<int> gen_status_;
   vector<vector<int>> gen_daughters_;
 
+  vector<float> genjet_pt_;
+  vector<float> genjet_eta_;
+  vector<float> genjet_phi_;
+  vector<float> genjet_mass_;
+
+  vector<float> genmet_pt_;
+  vector<float> genmet_phi_;
+
   vector<float> element_pt_;
   vector<float> element_pterror_;
   vector<float> element_px_;
@@ -301,6 +313,8 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   gsftracks_ = consumes<edm::View<reco::Track>>(edm::InputTag("electronGsfTracks"));
   saveHits = iConfig.getUntrackedParameter<bool>("saveHits", false);
   gsfElectrons_ = consumes<edm::View<reco::GsfElectron>>(edm::InputTag("gedGsfElectrons"));
+  genJets_ = consumes<edm::View<reco::GenJet>>(edm::InputTag("ak4GenJets"));
+  genMETs_ = consumes<edm::View<reco::GenMET>>(edm::InputTag("genMetTrue"));
 
   usesResource(TFileService::kSharedResource);
   edm::Service<TFileService> fs;
@@ -392,6 +406,14 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("gen_pdgid", &gen_pdgid_);
   t_->Branch("gen_status", &gen_status_);
   t_->Branch("gen_daughters", &gen_daughters_);
+
+  t_->Branch("genjet_pt", &genjet_pt_);
+  t_->Branch("genjet_eta", &genjet_eta_);
+  t_->Branch("genjet_phi", &genjet_phi_);
+  t_->Branch("genjet_mass", &genjet_mass_);
+
+  t_->Branch("genmet_pt", &genmet_pt_);
+  t_->Branch("genmet_phi", &genmet_phi_);
 
   //PF Elements
   t_->Branch("element_pt", &element_pt_);
@@ -572,6 +594,14 @@ void PFAnalysis::clearVariables() {
   gen_status_.clear();
   gen_daughters_.clear();
 
+  genjet_pt_.clear();
+  genjet_eta_.clear();
+  genjet_phi_.clear();
+  genjet_mass_.clear();
+
+  genmet_pt_.clear();
+  genmet_phi_.clear();
+
   element_pt_.clear();
   element_pterror_.clear();
   element_px_.clear();
@@ -695,6 +725,24 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       daughters[j] = static_cast<int>(it_p->daughterRefVector().at(j).key());
     }
     gen_daughters_.push_back(daughters);
+  }
+
+  edm::Handle<edm::View<reco::GenJet>> genJetsHandle;
+  iEvent.getByToken(genJets_, genJetsHandle);
+  const edm::View<reco::GenJet>& genJets = *genJetsHandle;
+  for (const auto& genjet : genJets) {
+    genjet_pt_.push_back(genjet.pt());
+    genjet_eta_.push_back(genjet.eta());
+    genjet_phi_.push_back(genjet.phi());
+    genjet_mass_.push_back(genjet.mass());
+  }
+
+  edm::Handle<edm::View<reco::GenMET>> genMETsHandle;
+  iEvent.getByToken(genMETs_, genMETsHandle);
+  const edm::View<reco::GenMET>& genMETs = *genMETsHandle;
+  for (const auto& genmet : genMETs) {
+    genmet_pt_.push_back(genmet.pt());
+    genmet_phi_.push_back(genmet.phi());
   }
 
   edm::Handle<std::vector<reco::PFCandidate>> pfCandidatesHandle;
