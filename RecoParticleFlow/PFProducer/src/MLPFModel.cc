@@ -267,6 +267,7 @@ namespace reco::mlpf {
           posEta[ihit] = RefPFRecHit->position().eta();
           posPhi[ihit] = deltaPhi(RefPFRecHit->position().phi(), ref->phi());
           depths[ihit] = RefPFRecHit->depth();
+          // std::cout << "CLH " << type << " d=" << RefPFRecHit->depth() << " l=" << RefPFRecHit->layer() << " e=" << energyHit << " px=" <<  RefPFRecHit->position().x() << " py=" <<  RefPFRecHit->position().y() << " pz=" <<  RefPFRecHit->position().z() << std::endl;
 
           if (depths[ihit] == 1) {
             depth1_hitE.push_back(hitE[ihit]);
