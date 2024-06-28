@@ -159,6 +159,7 @@ private:
   vector<int> simcluster_bx_;
   vector<int> simcluster_ev_;
   vector<int> simcluster_pid_;
+  vector<int> simcluster_charge_;
   vector<int> simcluster_idx_trackingparticle_;
   vector<int> simcluster_nhits_;
   vector<std::map<uint64_t, double>> simcluster_detids_;
@@ -195,12 +196,6 @@ private:
   vector<float> rechit_phi_;
   vector<int> rechit_idx_element_;
   vector<uint64_t> rechit_detid_;
-
-  vector<float> simtrack_x_;
-  vector<float> simtrack_y_;
-  vector<float> simtrack_z_;
-  vector<int> simtrack_idx_simcluster_;
-  vector<int> simtrack_pid_;
 
   vector<float> gen_eta_;
   vector<float> gen_phi_;
@@ -294,7 +289,10 @@ private:
   vector<float> trackingparticle_to_element_cmp;
   vector<pair<int, int>> caloparticle_to_element;
   vector<float> caloparticle_to_element_cmp;
+  vector<pair<int, int>> simcluster_to_element;
+  vector<float> simcluster_to_element_cmp;
   vector<pair<int, int>> element_to_candidate;
+  vector<pair<int, int>> caloparticle_to_simcluster;
 
   bool saveHits;
 };
@@ -344,15 +342,12 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("simcluster_eta", &simcluster_eta_);
   t_->Branch("simcluster_phi", &simcluster_phi_);
   t_->Branch("simcluster_pt", &simcluster_pt_);
-  t_->Branch("simcluster_px", &simcluster_px_);
-  t_->Branch("simcluster_py", &simcluster_py_);
-  t_->Branch("simcluster_pz", &simcluster_pz_);
   t_->Branch("simcluster_energy", &simcluster_energy_);
   t_->Branch("simcluster_bx", &simcluster_bx_);
   t_->Branch("simcluster_ev", &simcluster_ev_);
   t_->Branch("simcluster_pid", &simcluster_pid_);
+  t_->Branch("simcluster_charge", &simcluster_charge_);
   t_->Branch("simcluster_idx_trackingparticle", &simcluster_idx_trackingparticle_);
-  t_->Branch("simcluster_nhits", &simcluster_nhits_);
 
   t_->Branch("caloparticle_eta", &caloparticle_eta_);
   t_->Branch("caloparticle_phi", &caloparticle_phi_);
@@ -364,36 +359,6 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("caloparticle_pid", &caloparticle_pid_);
   t_->Branch("caloparticle_charge", &caloparticle_charge_);
   t_->Branch("caloparticle_idx_trackingparticle", &caloparticle_idx_trackingparticle_);
-
-  if (saveHits) {
-    t_->Branch("simhit_frac", &simhit_frac_);
-    t_->Branch("simhit_x", &simhit_x_);
-    t_->Branch("simhit_y", &simhit_y_);
-    t_->Branch("simhit_z", &simhit_z_);
-    t_->Branch("simhit_det", &simhit_det_);
-    t_->Branch("simhit_subdet", &simhit_subdet_);
-    t_->Branch("simhit_eta", &simhit_eta_);
-    t_->Branch("simhit_phi", &simhit_phi_);
-    t_->Branch("simhit_idx_simcluster", &simhit_idx_simcluster_);
-    t_->Branch("simhit_detid", &simhit_detid_);
-
-    t_->Branch("rechit_e", &rechit_e_);
-    t_->Branch("rechit_x", &rechit_x_);
-    t_->Branch("rechit_y", &rechit_y_);
-    t_->Branch("rechit_z", &rechit_z_);
-    t_->Branch("rechit_det", &rechit_det_);
-    t_->Branch("rechit_subdet", &rechit_subdet_);
-    t_->Branch("rechit_eta", &rechit_eta_);
-    t_->Branch("rechit_phi", &rechit_phi_);
-    t_->Branch("rechit_idx_element", &rechit_idx_element_);
-    t_->Branch("rechit_detid", &rechit_detid_);
-  }
-
-  t_->Branch("simtrack_x", &simtrack_x_);
-  t_->Branch("simtrack_y", &simtrack_y_);
-  t_->Branch("simtrack_z", &simtrack_z_);
-  t_->Branch("simtrack_idx_simcluster", &simtrack_idx_simcluster_);
-  t_->Branch("simtrack_pid", &simtrack_pid_);
 
   t_->Branch("gen_eta", &gen_eta_);
   t_->Branch("gen_phi", &gen_phi_);
@@ -490,7 +455,10 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("trackingparticle_to_element_cmp", &trackingparticle_to_element_cmp);
   t_->Branch("caloparticle_to_element", &caloparticle_to_element);
   t_->Branch("caloparticle_to_element_cmp", &caloparticle_to_element_cmp);
+  t_->Branch("simcluster_to_element", &simcluster_to_element);
+  t_->Branch("simcluster_to_element_cmp", &simcluster_to_element_cmp);
   t_->Branch("element_to_candidate", &element_to_candidate);
+  t_->Branch("caloparticle_to_simcluster", &caloparticle_to_simcluster);
 }  // constructor
 
 PFAnalysis::~PFAnalysis() {}
@@ -504,7 +472,10 @@ void PFAnalysis::clearVariables() {
   trackingparticle_to_element_cmp.clear();
   caloparticle_to_element.clear();
   caloparticle_to_element_cmp.clear();
+  simcluster_to_element.clear();
+  simcluster_to_element_cmp.clear();
   element_to_candidate.clear();
+  caloparticle_to_simcluster.clear();
 
   trackingparticle_eta_.clear();
   trackingparticle_phi_.clear();
@@ -532,14 +503,10 @@ void PFAnalysis::clearVariables() {
   simcluster_pt_.clear();
   simcluster_energy_.clear();
   simcluster_pid_.clear();
-  simcluster_detids_.clear();
+  simcluster_charge_.clear();
   simcluster_bx_.clear();
   simcluster_ev_.clear();
-  simcluster_px_.clear();
-  simcluster_py_.clear();
-  simcluster_pz_.clear();
   simcluster_idx_trackingparticle_.clear();
-  simcluster_nhits_.clear();
 
   caloparticle_pt_.clear();
   caloparticle_eta_.clear();
@@ -551,36 +518,6 @@ void PFAnalysis::clearVariables() {
   caloparticle_pid_.clear();
   caloparticle_charge_.clear();
   caloparticle_idx_trackingparticle_.clear();
-
-  if (saveHits) {
-    simhit_frac_.clear();
-    simhit_x_.clear();
-    simhit_y_.clear();
-    simhit_z_.clear();
-    simhit_det_.clear();
-    simhit_subdet_.clear();
-    simhit_eta_.clear();
-    simhit_phi_.clear();
-    simhit_idx_simcluster_.clear();
-    simhit_detid_.clear();
-
-    rechit_e_.clear();
-    rechit_x_.clear();
-    rechit_y_.clear();
-    rechit_z_.clear();
-    rechit_det_.clear();
-    rechit_subdet_.clear();
-    rechit_eta_.clear();
-    rechit_phi_.clear();
-    rechit_idx_element_.clear();
-    rechit_detid_.clear();
-  }
-
-  simtrack_x_.clear();
-  simtrack_y_.clear();
-  simtrack_z_.clear();
-  simtrack_idx_simcluster_.clear();
-  simtrack_pid_.clear();
 
   gen_eta_.clear();
   gen_phi_.clear();
@@ -683,7 +620,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   edm::Handle<edm::View<CaloParticle>> caloParticlesHandle;
   iEvent.getByToken(caloParticles_, caloParticlesHandle);
   const edm::View<CaloParticle>& caloParticles = *caloParticlesHandle;
-
+  
   //Matches reco tracks to sim tracks (TrackingParticle)
   edm::Handle<reco::RecoToSimCollection> recotosimCollection;
   iEvent.getByToken(tracks_recotosim_, recotosimCollection);
@@ -725,6 +662,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       daughters[j] = static_cast<int>(it_p->daughterRefVector().at(j).key());
     }
     gen_daughters_.push_back(daughters);
+    // std::cout << "gp pt=" << it_p->pt() << " pid=" << it_p->pdgId() << " dau=" << daughters.size() << std::endl;
   }
 
   edm::Handle<edm::View<reco::GenJet>> genJetsHandle;
@@ -835,7 +773,10 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   processTrackingParticles(trackingParticles, trackingParticlesHandle);
 
   map<pair<int, int>, float> caloparticle_to_pfcluster;
+  map<pair<int, int>, float> simcluster_to_pfcluster;
   map<uint64_t, vector<pair<int, float>>> simhit_to_caloparticle;
+  map<uint64_t, vector<pair<int, float>>> simhit_to_simcluster;
+  int nsimcluster = 0;
   for (unsigned int ncaloparticle = 0; ncaloparticle < caloParticles.size(); ncaloparticle++) {
     const auto& cp = caloParticles.at(ncaloparticle);
     edm::RefToBase<CaloParticle> cpref(caloParticlesHandle, ncaloparticle);
@@ -851,7 +792,8 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     caloparticle_pid_.push_back(cp.pdgId());
     caloparticle_charge_.push_back(cp.charge());
 
-    LOG << "cp=" << ncaloparticle << " pt=" << cp.p4().pt() << " typ=" << cp.pdgId();
+    // LOG << "cp=" << ncaloparticle << " pt=" << cp.p4().pt() << " typ=" << cp.pdgId();
+    // std::cout << "cp=" << ncaloparticle << " pt=" << cp.p4().pt() << " typ=" << cp.pdgId() << " gen=" << cp.genParticles().size() << " tid=" << cp.g4Tracks().at(0).trackId() << std::endl;
 
     const auto& simtrack = cp.g4Tracks().at(0);
 
@@ -867,11 +809,37 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     }  //trackingParticles
     caloparticle_idx_trackingparticle_.push_back(caloparticle_to_trackingparticle);
 
-    for (const auto& simcluster : cp.simClusters()) {
-      for (const auto& hf : simcluster->hits_and_fractions()) {
+    for (const auto& simcluster_ref : cp.simClusters()) {
+      const auto& simcluster = *simcluster_ref;
+      simcluster_eta_.push_back(simcluster.p4().eta());
+      simcluster_phi_.push_back(simcluster.p4().phi());
+      simcluster_pt_.push_back(simcluster.p4().pt());
+      simcluster_energy_.push_back(simcluster.p4().energy());
+      simcluster_pid_.push_back(simcluster.pdgId());
+      simcluster_charge_.push_back(simcluster.charge());
+      simcluster_bx_.push_back(simcluster.eventId().bunchCrossing());
+      simcluster_ev_.push_back(simcluster.eventId().event());
+      // std::cout << "  sc pt=" << simcluster.p4().pt() << " typ=" << simcluster.pdgId() << " gen=" << simcluster.genParticles().size() << " tid=" << simcluster.g4Tracks().at(0).trackId() << std::endl;
+      
+      int simcluster_to_trackingparticle = -1;
+      for (size_t itp = 0; itp < trackingParticles.size(); itp++) {
+        const auto& simtrack2 = trackingParticles.at(itp).g4Tracks().at(0);
+        //compare the two tracks, taking into account that both eventId and trackId need to be compared due to pileup
+        if (simcluster.g4Tracks().at(0).eventId() == simtrack2.eventId() && simcluster.g4Tracks().at(0).trackId() == simtrack2.trackId()) {
+          simcluster_to_trackingparticle = itp;
+          //we are satisfied with the first match, in practice there should not be more
+          break;
+        }
+      }  //trackingParticles
+      simcluster_idx_trackingparticle_.push_back(simcluster_to_trackingparticle);
+
+      for (const auto& hf : simcluster.hits_and_fractions()) {
         LOG << "  cp=" << ncaloparticle << " detid=" << hf.first << " " << hf.second;
         simhit_to_caloparticle[hf.first].push_back({ncaloparticle, hf.second});
+        simhit_to_simcluster[hf.first].push_back({nsimcluster, hf.second});
       }
+      caloparticle_to_simcluster.push_back({ncaloparticle, nsimcluster});
+      nsimcluster++;
     }  //simclusters
   }    //caloParticles
 
@@ -926,6 +894,17 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
               caloparticle_to_pfcluster[key] = 0.0;
             }
             caloparticle_to_pfcluster[key] += rechit_frac.second * simhit_frac.second;
+          }
+        }
+        
+	const auto& found_sc = simhit_to_simcluster.find(rechit_frac.first);
+        if (found_sc != simhit_to_simcluster.end()) {
+          for (const auto& simhit_frac : (*found_sc).second) {
+            const pair<size_t, size_t> key{simhit_frac.first, ielem};
+            if (simcluster_to_pfcluster.find(key) == simcluster_to_pfcluster.end()) {
+              simcluster_to_pfcluster[key] = 0.0;
+            }
+            simcluster_to_pfcluster[key] += rechit_frac.second * simhit_frac.second;
           }
         }
       }
@@ -996,6 +975,14 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     caloparticle_to_element.push_back(cp_pf);
     caloparticle_to_element_cmp.push_back(energy);
     LOG << "cp_to_elem=" << cp_pf.first << "," << cp_pf.second << " e=" << energy;
+  }
+  
+  for (const auto& sc_to_pf : simcluster_to_pfcluster) {
+    const auto& sc_pf = sc_to_pf.first;
+    const auto energy = sc_to_pf.second;
+    simcluster_to_element.push_back(sc_pf);
+    simcluster_to_element_cmp.push_back(energy);
+    LOG << "sc_to_elem=" << sc_pf.first << "," << sc_pf.second << " e=" << energy;
   }
 
   //associate candidates to elements
@@ -1068,6 +1055,7 @@ void PFAnalysis::processTrackingParticles(const edm::View<TrackingParticle>& tra
 
     trackingparticle_pid_.push_back(tp.pdgId());
     trackingparticle_charge_.push_back(tp.charge());
+    // std::cout << "tp=" << ntrackingparticle << " pt=" << tp.p4().pt() << " typ=" << tp.pdgId() << " gen=" << tp.genParticles().size() << " tid=" << tp.g4Tracks().at(0).trackId() << std::endl;
   }
 }
 
