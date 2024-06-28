@@ -212,7 +212,7 @@ private:
   vector<float> genjet_pt_;
   vector<float> genjet_eta_;
   vector<float> genjet_phi_;
-  vector<float> genjet_mass_;
+  vector<float> genjet_energy_;
 
   vector<float> genmet_pt_;
   vector<float> genmet_phi_;
@@ -375,7 +375,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("genjet_pt", &genjet_pt_);
   t_->Branch("genjet_eta", &genjet_eta_);
   t_->Branch("genjet_phi", &genjet_phi_);
-  t_->Branch("genjet_mass", &genjet_mass_);
+  t_->Branch("genjet_energy", &genjet_energy_);
 
   t_->Branch("genmet_pt", &genmet_pt_);
   t_->Branch("genmet_phi", &genmet_phi_);
@@ -534,7 +534,7 @@ void PFAnalysis::clearVariables() {
   genjet_pt_.clear();
   genjet_eta_.clear();
   genjet_phi_.clear();
-  genjet_mass_.clear();
+  genjet_energy_.clear();
 
   genmet_pt_.clear();
   genmet_phi_.clear();
@@ -672,7 +672,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     genjet_pt_.push_back(genjet.pt());
     genjet_eta_.push_back(genjet.eta());
     genjet_phi_.push_back(genjet.phi());
-    genjet_mass_.push_back(genjet.mass());
+    genjet_energy_.push_back(genjet.energy());
   }
 
   edm::Handle<edm::View<reco::GenMET>> genMETsHandle;
