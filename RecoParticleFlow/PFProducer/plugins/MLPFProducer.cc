@@ -191,7 +191,7 @@ void MLPFProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptions
   desc.add<edm::InputTag>("src", edm::InputTag("particleFlowBlock"));
   desc.add<edm::FileInPath>("model_path",
                             edm::FileInPath("RecoParticleFlow/PFProducer/data/mlpf/"
-                                            "mlpf_21M_attn2x6x512_bs40_relu_tt_qcd_zh400k_checkpoint25_1xa100_fp32_fused.onnx"));
+                                            "mlpf_28M_attn2x8x512_bm4_relu_tt_qcd_ttnopu_v2_0_0_checkpoint6_1xa100_fp32_fused.onnx"));
   desc.add<bool>("use_cuda", false);
   descriptions.addWithDefaultLabel(desc);
 }
