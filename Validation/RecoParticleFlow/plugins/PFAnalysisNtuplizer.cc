@@ -161,6 +161,7 @@ private:
   vector<int> simcluster_pid_;
   vector<int> simcluster_charge_;
   vector<int> simcluster_idx_trackingparticle_;
+  vector<int> simcluster_idx_caloparticle_;
   vector<int> simcluster_nhits_;
   vector<std::map<uint64_t, double>> simcluster_detids_;
 
@@ -348,6 +349,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("simcluster_pid", &simcluster_pid_);
   t_->Branch("simcluster_charge", &simcluster_charge_);
   t_->Branch("simcluster_idx_trackingparticle", &simcluster_idx_trackingparticle_);
+  t_->Branch("simcluster_idx_caloparticle", &simcluster_idx_caloparticle_);
 
   t_->Branch("caloparticle_eta", &caloparticle_eta_);
   t_->Branch("caloparticle_phi", &caloparticle_phi_);
@@ -507,6 +509,7 @@ void PFAnalysis::clearVariables() {
   simcluster_bx_.clear();
   simcluster_ev_.clear();
   simcluster_idx_trackingparticle_.clear();
+  simcluster_idx_caloparticle_.clear();
 
   caloparticle_pt_.clear();
   caloparticle_eta_.clear();
@@ -819,6 +822,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       simcluster_charge_.push_back(simcluster.charge());
       simcluster_bx_.push_back(simcluster.eventId().bunchCrossing());
       simcluster_ev_.push_back(simcluster.eventId().event());
+      simcluster_idx_caloparticle_.push_back(ncaloparticle);
       // std::cout << "  sc pt=" << simcluster.p4().pt() << " typ=" << simcluster.pdgId() << " gen=" << simcluster.genParticles().size() << " tid=" << simcluster.g4Tracks().at(0).trackId() << std::endl;
       
       int simcluster_to_trackingparticle = -1;
