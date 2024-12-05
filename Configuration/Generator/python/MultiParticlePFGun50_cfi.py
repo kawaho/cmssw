@@ -2,7 +2,7 @@ import FWCore.ParameterSet.Config as cms
 
 generator = cms.EDProducer("FlatEtaRangeGunProducer",
     PGunParameters = cms.PSet(
-        PartID = cms.vint32([11, -11, 13, -13, 211, -211, 22, 130, -130, 111, -111]),
+        PartID = cms.vint32([11, -11, 13, -13, 211, -211, 22, 130, -130]),
         MinEta = cms.double(-5),
         MaxEta = cms.double(5),
         MinPhi = cms.double(-3.14159265359),
