@@ -665,7 +665,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       daughters[j] = static_cast<int>(it_p->daughterRefVector().at(j).key());
     }
     gen_daughters_.push_back(daughters);
-    // std::cout << "gp pt=" << it_p->pt() << " pid=" << it_p->pdgId() << " dau=" << daughters.size() << std::endl;
+    LOG << "gp pt=" << it_p->pt() << " pid=" << it_p->pdgId() << " dau=" << daughters.size() << std::endl;
   }
 
   edm::Handle<edm::View<reco::GenJet>> genJetsHandle;
@@ -795,8 +795,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
     caloparticle_pid_.push_back(cp.pdgId());
     caloparticle_charge_.push_back(cp.charge());
 
-    // LOG << "cp=" << ncaloparticle << " pt=" << cp.p4().pt() << " typ=" << cp.pdgId();
-    // std::cout << "cp=" << ncaloparticle << " pt=" << cp.p4().pt() << " typ=" << cp.pdgId() << " gen=" << cp.genParticles().size() << " tid=" << cp.g4Tracks().at(0).trackId() << std::endl;
+    LOG << "cp=" << ncaloparticle << " pt=" << cp.p4().pt() << " typ=" << cp.pdgId();
 
     const auto& simtrack = cp.g4Tracks().at(0);
 
@@ -823,7 +822,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       simcluster_bx_.push_back(simcluster.eventId().bunchCrossing());
       simcluster_ev_.push_back(simcluster.eventId().event());
       simcluster_idx_caloparticle_.push_back(ncaloparticle);
-      // std::cout << "  sc pt=" << simcluster.p4().pt() << " typ=" << simcluster.pdgId() << " gen=" << simcluster.genParticles().size() << " tid=" << simcluster.g4Tracks().at(0).trackId() << std::endl;
+      LOG << "  sc pt=" << simcluster.p4().pt() << " typ=" << simcluster.pdgId() << " gen=" << simcluster.genParticles().size() << " tid=" << simcluster.g4Tracks().at(0).trackId() << std::endl;
       
       int simcluster_to_trackingparticle = -1;
       for (size_t itp = 0; itp < trackingParticles.size(); itp++) {
@@ -838,7 +837,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       simcluster_idx_trackingparticle_.push_back(simcluster_to_trackingparticle);
 
       for (const auto& hf : simcluster.hits_and_fractions()) {
-        LOG << "  cp=" << ncaloparticle << " detid=" << hf.first << " " << hf.second;
+        LOG << "  cp=" << ncaloparticle << " sc=" << nsimcluster << " detid=" << hf.first << " " << hf.second;
         simhit_to_caloparticle[hf.first].push_back({ncaloparticle, hf.second});
         simhit_to_simcluster[hf.first].push_back({nsimcluster, hf.second});
       }
@@ -897,6 +896,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
             if (caloparticle_to_pfcluster.find(key) == caloparticle_to_pfcluster.end()) {
               caloparticle_to_pfcluster[key] = 0.0;
             }
+	    LOG << "cp match " << key.first << " " << key.second << " " << rechit_frac.second << " " << simhit_frac.second;
             caloparticle_to_pfcluster[key] += rechit_frac.second * simhit_frac.second;
           }
         }
@@ -908,6 +908,7 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
             if (simcluster_to_pfcluster.find(key) == simcluster_to_pfcluster.end()) {
               simcluster_to_pfcluster[key] = 0.0;
             }
+	    LOG << "sc match " << key.first << " " << key.second << " " << rechit_frac.second << " " << simhit_frac.second;
             simcluster_to_pfcluster[key] += rechit_frac.second * simhit_frac.second;
           }
         }
@@ -1059,7 +1060,7 @@ void PFAnalysis::processTrackingParticles(const edm::View<TrackingParticle>& tra
 
     trackingparticle_pid_.push_back(tp.pdgId());
     trackingparticle_charge_.push_back(tp.charge());
-    // std::cout << "tp=" << ntrackingparticle << " pt=" << tp.p4().pt() << " typ=" << tp.pdgId() << " gen=" << tp.genParticles().size() << " tid=" << tp.g4Tracks().at(0).trackId() << std::endl;
+    LOG << "tp=" << ntrackingparticle << " pt=" << tp.p4().pt() << " typ=" << tp.pdgId() << " gen=" << tp.genParticles().size() << " tid=" << tp.g4Tracks().at(0).trackId() << std::endl;
   }
 }
 

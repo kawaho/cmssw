@@ -81,4 +81,9 @@ def customize_step3(process):
     
     process.schedule.append(process.pfana_path)
 
+    # process.load("FWCore.MessageService.MessageLogger_cfi")
+    # process.MessageLogger.cerr.threshold = "TRACE"
+    # process.MessageLogger.debugModules = ["*"]
+
+
     return process
