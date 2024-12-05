@@ -53,14 +53,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     num_elements_total += 1;
     selected_elements.push_back(pelem);
   }
-  const auto tensor_size = LSH_BIN_SIZE * std::max(2u, (num_elements_total / LSH_BIN_SIZE + 1));
-
-#ifdef MLPF_DEBUG
-  assert(num_elements_total < NUM_MAX_ELEMENTS_BATCH);
-  //tensor size must be a multiple of the bin size and larger than the number of elements
-  assert(tensor_size <= NUM_MAX_ELEMENTS_BATCH);
-  assert(tensor_size % LSH_BIN_SIZE == 0);
-#endif
+  const auto tensor_size = num_elements_total;
 
 #ifdef MLPF_DEBUG
   std::cout << "tensor_size=" << tensor_size << std::endl;
@@ -92,11 +85,17 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
   //run the GNN inference, given the inputs and the output.
   const auto& outputs = globalCache()->run({"Xfeat_normed", "mask"}, inputs, {{1, tensor_size, NUM_ELEMENT_FEATURES}, {1, tensor_size}});
-  const auto& output_id = outputs[0];
-  const auto& output_p4 = outputs[1];
+  const auto& output_binary = outputs[0];
+  const auto& output_pid = outputs[1];
+  const auto& output_p4 = outputs[2];
+
 #ifdef MLPF_DEBUG
-  std::cout << "output_id=" << output_id.size() << std::endl;  
-  assert(output_id.size() == tensor_size * NUM_OUTPUT_FEATURES_CLS);
+  std::cout << "output_binary=" << output_binary.size() << std::endl;  
+  assert(output_binary.size() == tensor_size * 2);
+
+  std::cout << "output_pid=" << output_pid.size() << std::endl;  
+  assert(output_pid.size() == tensor_size * NUM_OUTPUT_FEATURES_CLS);
+
   std::cout << "output_p4=" << output_p4.size() << std::endl;  
   assert(output_p4.size() == tensor_size * NUM_OUTPUT_FEATURES_P4);
 #endif
@@ -106,19 +105,6 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     std::vector<float> pred_id_probas(pdgid_encoding.size(), 0.0);
     const reco::PFBlockElement* elem = selected_elements[ielem];
 
-    for (unsigned int idx_id = 0; idx_id < pred_id_probas.size(); idx_id++) {
-      auto pred_proba = output_id[ielem * NUM_OUTPUT_FEATURES_CLS + idx_id];
-#ifdef MLPF_DEBUG
-      assert(!std::isnan(pred_proba));
-#endif
-      pred_id_probas[idx_id] = pred_proba;
-    }
-
-    auto imax = argMax(pred_id_probas);
-
-    //get the most probable class PDGID
-    int pred_pid = pdgid_encoding.at(imax);
-
 #ifdef MLPF_DEBUG
     std::cout << "ielem=" << ielem << " inputs:";
     for (unsigned int iprop = 0; iprop < NUM_ELEMENT_FEATURES; iprop++) {
@@ -126,6 +112,29 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     }
     std::cout << std::endl;
 #endif
+
+    const auto logit_no_ptcl = output_binary[ielem * 2 + 0];
+    const auto logit_ptcl = output_binary[ielem * 2 + 1];
+#ifdef MLPF_DEBUG
+    std::cout << "binary: " << logit_no_ptcl << " " << logit_ptcl << std::endl;
+#endif
+   
+    // Check if the binary classifier of the model predicted a particle 
+    int pred_pid = 0;
+    if (logit_ptcl > logit_no_ptcl) {
+      for (unsigned int idx_id = 0; idx_id < pred_id_probas.size(); idx_id++) {
+        auto pred_proba = output_pid[ielem * NUM_OUTPUT_FEATURES_CLS + idx_id];
+#ifdef MLPF_DEBUG
+        assert(!std::isnan(pred_proba));
+#endif
+        pred_id_probas[idx_id] = pred_proba;
+      }
+  
+      auto imax = argMax(pred_id_probas);
+  
+      //get the most probable class PDGID
+      pred_pid = pdgid_encoding.at(imax);
+    }
 
     //a particle was predicted for this PFElement, otherwise it was a spectator
     if (pred_pid != 0) {
@@ -191,7 +200,7 @@ void MLPFProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptions
   desc.add<edm::InputTag>("src", edm::InputTag("particleFlowBlock"));
   desc.add<edm::FileInPath>("model_path",
                             edm::FileInPath("RecoParticleFlow/PFProducer/data/mlpf/"
-                                            "mlpf_110M_attn2x6x1024_bm5_relu_checkpoint18_8xmi250x_fp32_fused"));
+                                            "mlpf_110M_attn2x6x1024_bm5_relu_checkpoint18_8xmi250x_fp32_fused.onnx"));
   desc.add<bool>("use_cuda", false);
   descriptions.addWithDefaultLabel(desc);
 }

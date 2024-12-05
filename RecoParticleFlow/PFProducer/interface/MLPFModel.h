@@ -131,16 +131,12 @@ namespace reco::mlpf {
   static constexpr unsigned int NUM_OUTPUT_FEATURES_CLS = 9;
   static constexpr unsigned int NUM_OUTPUT_FEATURES_P4 = 5;
 
-  //these are defined at model creation time and set the random LSH codebook size
-  static constexpr int LSH_BIN_SIZE = 256;
-  static constexpr int NUM_MAX_ELEMENTS_BATCH = 100 * LSH_BIN_SIZE;
-
   //In CPU mode, we want to evaluate each event separately
   static constexpr int BATCH_SIZE = 1;
 
   //index [0, N_pdgids) -> PDGID
   //this maps the absolute values of the predicted PDGIDs to an array of ascending indices
-  static constexpr std::array<int, 9> pdgid_encoding{{0, 211, 130, 1, 2, 22, 11, 13, 15}};
+  static constexpr std::array<int, 9> pdgid_encoding{{0, 211, 130, 1, 2, 22, 11, 13}};
   
   static constexpr unsigned int IDX_CLASS_LAST = pdgid_encoding.size()-1;
 
