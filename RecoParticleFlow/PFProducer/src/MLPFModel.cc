@@ -468,13 +468,7 @@ namespace reco::mlpf {
     for (const auto& block : blocks) {
       const auto& elems = block.elements();
       for (const auto& elem : elems) {
-        if (all_elements.size() < NUM_MAX_ELEMENTS_BATCH) {
-          all_elements.push_back(&elem);
-        } else {
-          //model needs to be created with a bigger LSH codebook size
-          edm::LogError("MLPFProducer") << "too many input PFElements for predefined model size:" << elems.size();
-          break;
-        }
+        all_elements.push_back(&elem);
       }
     }
     return all_elements;
