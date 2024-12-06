@@ -406,11 +406,6 @@ namespace reco::mlpf {
 
   //to make sure DNN inputs are within numerical bounds, use the same in training
   float normalize(float in) {
-    if (std::abs(in) > 1e4f) {
-      return 0.0;
-    } else if (edm::isNotFinite(in)) {
-      return 0.0;
-    }
     return in;
   }
 
@@ -455,6 +450,7 @@ namespace reco::mlpf {
     cand.setMass(0.0);
     if (pred_pid == 211)
       cand.setMass(PI_MASS);
+
     //cand.setPdgId(pred_pid);
     //cand.setCharge(charge);
 

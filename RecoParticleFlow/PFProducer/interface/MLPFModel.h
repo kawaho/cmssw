@@ -136,7 +136,7 @@ namespace reco::mlpf {
 
   //index [0, N_pdgids) -> PDGID
   //this maps the absolute values of the predicted PDGIDs to an array of ascending indices
-  static constexpr std::array<int, 9> pdgid_encoding{{0, 211, 130, 1, 2, 22, 11, 13}};
+  static constexpr std::array<int, 9> pdgid_encoding{{0, 211, 130, 1, 2, 22, 11, 13, 15}};
   
   static constexpr unsigned int IDX_CLASS_LAST = pdgid_encoding.size()-1;
 
