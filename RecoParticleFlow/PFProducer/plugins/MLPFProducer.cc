@@ -125,6 +125,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
       for (unsigned int idx_id = 0; idx_id < pred_id_probas.size(); idx_id++) {
         auto pred_proba = output_pid[ielem * NUM_OUTPUT_FEATURES_CLS + idx_id];
 #ifdef MLPF_DEBUG
+        std::cout << "pid proba: " << pred_proba << std::endl;
         assert(!std::isnan(pred_proba));
 #endif
         pred_id_probas[idx_id] = pred_proba;
@@ -135,6 +136,15 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
       //get the most probable class PDGID
       pred_pid = pdgid_encoding.at(imax);
     }
+
+#ifdef MLPF_DEBUG
+    std::cout << "p4: "
+      << output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + 0] << " "
+      << output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + 1] << " " 
+      << output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + 2] << " " 
+      << output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + 3] << " " 
+      << output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + 4] << std::endl;
+#endif
 
     //a particle was predicted for this PFElement, otherwise it was a spectator
     if (pred_pid != 0) {
@@ -169,10 +179,12 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
       //get the predicted momentum components from the model
       float pred_pt = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_PT];
+      pred_pt = exp(pred_pt) * inputs[0][ielem * NUM_ELEMENT_FEATURES + 1]; 
       float pred_eta = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_ETA];
       float pred_sin_phi = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_SIN_PHI];
       float pred_cos_phi = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_COS_PHI];
       float pred_e = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_ENERGY];
+      pred_e = exp(pred_e) * inputs[0][ielem * NUM_ELEMENT_FEATURES + 5];
 
       auto cand = makeCandidate(pred_pid, pred_charge, pred_pt, pred_eta, pred_sin_phi, pred_cos_phi, pred_e);
       setCandidateRefs(cand, selected_elements, ielem);
