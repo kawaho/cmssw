@@ -40,6 +40,9 @@ def customize_step2(process):
     process.FEVTDEBUGHLToutput.outputCommands.append('keep *_simSiPixelDigis_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep *_*_MergedCaloTruth_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep *_*_MergedTrackTruth_*')
+    #process.FEVTDEBUGHLToutput.outputCommands.append("keep *_*G4*_*_*")
+    #process.FEVTDEBUGHLToutput.outputCommands.append("keep SimClustersedmAssociation_mix_*_*")
+    #process.FEVTDEBUGHLToutput.outputCommands.append("keep CaloParticlesedmAssociation_mix_*_*")
     return process
  
 def customize_step3(process):
@@ -58,6 +61,9 @@ def customize_step3(process):
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoTracks_*_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoGsfTracks_*_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoPFBlocks_*_*_*')
+    #process.FEVTDEBUGHLToutput.outputCommands.append("keep *_*G4*_*_*")
+    #process.FEVTDEBUGHLToutput.outputCommands.append("keep SimClustersedmAssociation_mix_*_*")
+    #process.FEVTDEBUGHLToutput.outputCommands.append("keep CaloParticlesedmAssociation_mix_*_*")
 
     process.load("SimTracker.TrackerHitAssociation.tpClusterProducer_cfi")
     process.load("SimTracker.TrackAssociatorProducers.quickTrackAssociatorByHits_cfi")
