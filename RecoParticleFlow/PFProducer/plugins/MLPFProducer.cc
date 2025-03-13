@@ -12,7 +12,7 @@
 using namespace cms::Ort;
 
 //use this to switch on detailed print statements in MLPF
-//#define MLPF_DEBUG
+#define MLPF_DEBUG
 
 class MLPFProducer : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>> {
 public:
@@ -45,19 +45,25 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
   const auto& gsfElectrons = event.get(gsfElectrons_);
 
   std::vector<const reco::PFBlockElement*> selected_elements;
-  unsigned int num_elements_total = 0;
+  unsigned int num_elements_total = all_elements.size();
+  unsigned int num_elements_skipped = 0;
+  unsigned int num_elements_selected = 0;
   for (const auto* pelem : all_elements) {
     if (pelem->type() == reco::PFBlockElement::PS1 || pelem->type() == reco::PFBlockElement::PS2 || pelem->type() == reco::PFBlockElement::BREM) {
+      num_elements_skipped += 1;
       continue;
     }
-    num_elements_total += 1;
+    num_elements_selected += 1;
     selected_elements.push_back(pelem);
   }
-  const auto tensor_size = num_elements_total;
 
 #ifdef MLPF_DEBUG
-  std::cout << "tensor_size=" << tensor_size << std::endl;
+  std::cout << "num_elements_total=" << num_elements_total
+            << " num_elements_skipped=" << num_elements_skipped
+            << " num_elements_selected=" << num_elements_selected << std::endl;
 #endif
+  
+  const auto tensor_size = num_elements_selected;
 
   //Fill the input tensor (batch, elems, features) = (1, tensor_size, NUM_ELEMENT_FEATURES)
   std::vector<std::vector<float>> inputs;
@@ -68,6 +74,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     if (ielem > tensor_size) {
       continue;
     }
+    std::cout << "ielem=" << ielem << std::endl;
 
     const auto& elem = *pelem;
 
@@ -76,12 +83,19 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
     //copy features to the input array
     for (unsigned int iprop = 0; iprop < NUM_ELEMENT_FEATURES; iprop++) {
-      inputs[0][ielem * NUM_ELEMENT_FEATURES + iprop] = normalize(props[iprop]);
+      const auto vec_elem = ielem * NUM_ELEMENT_FEATURES + iprop;
+      assert(vec_elem < inputs[0].size()); 
+      inputs[0][vec_elem] = normalize(props[iprop]);
     }
     //mask
     inputs[1][ielem] = 1.0;
     ielem += 1;
   }
+
+  for (unsigned int _idx=0; _idx < inputs[0].size(); _idx++) {
+    std::cout << inputs[0][_idx] << " " << std::endl;
+  }
+  std::cout << std::endl;
 
   //run the GNN inference, given the inputs and the output.
   const auto& outputs = globalCache()->run({"Xfeat_normed", "mask"}, inputs, {{1, tensor_size, NUM_ELEMENT_FEATURES}, {1, tensor_size}});
