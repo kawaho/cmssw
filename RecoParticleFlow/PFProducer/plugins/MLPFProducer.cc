@@ -12,7 +12,7 @@
 using namespace cms::Ort;
 
 //use this to switch on detailed print statements in MLPF
-#define MLPF_DEBUG
+//#define MLPF_DEBUG
 
 class MLPFProducer : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>> {
 public:
@@ -74,7 +74,9 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     if (ielem > tensor_size) {
       continue;
     }
+#ifdef MLPF_DEBUG
     std::cout << "ielem=" << ielem << std::endl;
+#endif
 
     const auto& elem = *pelem;
 
@@ -92,10 +94,12 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     ielem += 1;
   }
 
+#ifdef MLPF_DEBUG
   for (unsigned int _idx=0; _idx < inputs[0].size(); _idx++) {
     std::cout << inputs[0][_idx] << " ";
   }
   std::cout << std::endl;
+#endif
 
   //run the GNN inference, given the inputs and the output.
   const auto& outputs = globalCache()->run({"Xfeat_normed", "mask"}, inputs, {{1, tensor_size, NUM_ELEMENT_FEATURES}, {1, tensor_size}});
