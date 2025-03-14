@@ -93,7 +93,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
   }
 
   for (unsigned int _idx=0; _idx < inputs[0].size(); _idx++) {
-    std::cout << inputs[0][_idx] << " " << std::endl;
+    std::cout << inputs[0][_idx] << " ";
   }
   std::cout << std::endl;
 
@@ -115,7 +115,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 #endif
 
   std::vector<reco::PFCandidate> pOutputCandidateCollection;
-  for (size_t ielem = 0; ielem < num_elements_total; ielem++) {
+  for (size_t ielem = 0; ielem < num_elements_selected; ielem++) {
     std::vector<float> pred_id_probas(pdgid_encoding.size(), 0.0);
     const reco::PFBlockElement* elem = selected_elements[ielem];
 
