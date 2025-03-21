@@ -27,14 +27,12 @@ public:
 
 private:
   const edm::EDPutTokenT<reco::PFCandidateCollection> pfCandidatesPutToken_;
-  const edm::EDPutTokenT<std::vector<float>> puPrediction_;
   const edm::EDGetTokenT<edm::View<reco::GsfElectron>> gsfElectrons_;
   const edm::EDGetTokenT<reco::PFBlockCollection> inputTagBlocks_;
 };
 
 MLPFProducer::MLPFProducer(const edm::ParameterSet& cfg, const ONNXRuntime* cache)
     : pfCandidatesPutToken_{produces<reco::PFCandidateCollection>()},
-      puPrediction_{produces<std::vector<float>>("mlpfPUPred")},
       gsfElectrons_{consumes<edm::View<reco::GsfElectron>>(edm::InputTag("gedGsfElectronsTmp"))},
       inputTagBlocks_{consumes<reco::PFBlockCollection>(cfg.getParameter<edm::InputTag>("src"))} {}
 
@@ -103,7 +101,6 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 #endif
 
   std::vector<reco::PFCandidate> pOutputCandidateCollection;
-  std::vector<float> pOutputPUPrediction;
 
   for (size_t ielem = 0; ielem < num_elements_total; ielem++) {
     std::vector<float> pred_id_probas(pdgid_encoding.size(), 0.0);
@@ -191,8 +188,8 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
       pred_e = exp(pred_e) * inputs[0][ielem * NUM_ELEMENT_FEATURES + 5];
 
       //get the predicted PU probability
+      //set to 0 now until new training is available
       float pred_ispu = 0;
-      pOutputPUPrediction.push_back(pred_pid);
 
       auto cand = makeCandidate(pred_pid, pred_charge, pred_pt, pred_eta, pred_sin_phi, pred_cos_phi, pred_e, pred_ispu);
       setCandidateRefs(cand, selected_elements, ielem);
@@ -209,8 +206,6 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
   event.emplace(pfCandidatesPutToken_, pOutputCandidateCollection);
 
-  auto pOutputPUPrediction_ = std::make_unique<std::vector<float>>(pOutputPUPrediction);
-  event.put(std::move(pOutputPUPrediction_), "mlpfPUPred");
 }
 
 std::unique_ptr<ONNXRuntime> MLPFProducer::initializeGlobalCache(const edm::ParameterSet& params) {

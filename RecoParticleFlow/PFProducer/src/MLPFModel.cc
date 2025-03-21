@@ -452,6 +452,7 @@ namespace reco::mlpf {
     if (pred_pid == 211)
       cand.setMass(PI_MASS);
 
+    cand.set_mlpf_pu(pred_ispu);
     //cand.setPdgId(pred_pid);
     //cand.setCharge(charge);
 
