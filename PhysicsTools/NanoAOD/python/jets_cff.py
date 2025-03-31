@@ -597,11 +597,39 @@ jetMCTable = cms.EDProducer("SimpleCandidateFlatTableProducer",
     singleton = cms.bool(False), # the number of entries is variable
     extension = cms.bool(True), # this is an extension  table for the jets
     variables = cms.PSet(
-        partonFlavour = Var("partonFlavour()", int, doc="flavour from parton matching"),
-        hadronFlavour = Var("hadronFlavour()", int, doc="flavour from hadron ghost clustering"),
+#        partonFlavour = Var("partonFlavour()", int, doc="flavour from parton matching"),
+#        hadronFlavour = Var("hadronFlavour()", int, doc="flavour from hadron ghost clustering"),
         genJetIdx = Var("?genJetFwdRef().backRef().isNonnull()?genJetFwdRef().backRef().key():-1", int, doc="index of matched gen jet"),
     )
 )
+
+patJetPartons = cms.EDProducer('HadronAndPartonSelector',
+    src = cms.InputTag("generator"),
+    particles = cms.InputTag("prunedGenParticles"),
+    partonMode = cms.string("Auto"),
+    fullChainPhysPartons = cms.bool(True)
+)
+
+JetFlavourAssociation = cms.EDProducer("JetFlavourClustering",
+    jets = jetMCTable.src,
+    bHadrons = cms.InputTag("patJetPartons","bHadrons"),
+    cHadrons = cms.InputTag("patJetPartons","cHadrons"),
+    partons = cms.InputTag("patJetPartons","physicsPartons"),
+    leptons = cms.InputTag("patJetPartons","leptons"),
+    jetAlgorithm = cms.string("AntiKt"),
+    rParam = cms.double(0.4),
+    ghostRescaling = cms.double(1e-18),
+    hadronFlavourHasPriority = cms.bool(False)
+)
+
+JetFlavourTable = cms.EDProducer("JetFlavourTableProducer",
+    name = jetMCTable.name,
+    src = jetMCTable.src,
+    cut = jetMCTable.cut,
+    deltaR = cms.double(0.1),
+    jetFlavourInfos = cms.InputTag("JetFlavourAssociation"),#slimmedGenJetsFlavourInfos"),
+)
+
 genJetTable = cms.EDProducer("SimpleCandidateFlatTableProducer",
     src = cms.InputTag("slimmedGenJets"),
     cut = cms.string("pt > 10"),
@@ -612,12 +640,6 @@ genJetTable = cms.EDProducer("SimpleCandidateFlatTableProducer",
     variables = cms.PSet(P4Vars,
 	#anything else?
     )
-)
-patJetPartons = cms.EDProducer('HadronAndPartonSelector',
-    src = cms.InputTag("generator"),
-    particles = cms.InputTag("prunedGenParticles"),
-    partonMode = cms.string("Auto"),
-    fullChainPhysPartons = cms.bool(True)
 )
 genJetFlavourAssociation = cms.EDProducer("JetFlavourClustering",
     jets = genJetTable.src,
@@ -635,7 +657,7 @@ genJetFlavourTable = cms.EDProducer("GenJetFlavourTableProducer",
     src = genJetTable.src,
     cut = genJetTable.cut,
     deltaR = cms.double(0.1),
-    jetFlavourInfos = cms.InputTag("slimmedGenJetsFlavourInfos"),
+    jetFlavourInfos = cms.InputTag("genJetFlavourAssociation"),#slimmedGenJetsFlavourInfos"),
 )
 
 genJetAK8Table = cms.EDProducer("SimpleCandidateFlatTableProducer",
@@ -765,7 +787,8 @@ jetLepSequence = cms.Sequence(lepInJetVars)
 jetTables = cms.Sequence(bjetNN+cjetNN+jetTable+fatJetTable+subJetTable+saJetTable+saTable)
 
 #MC only producers and tables
-jetMC = cms.Sequence(jetMCTable+genJetTable+patJetPartons+genJetFlavourTable+genJetAK8Table+genJetAK8FlavourAssociation+genJetAK8FlavourTable+fatJetMCTable+genSubJetAK8Table+subjetMCTable)
+#jetMC = cms.Sequence(jetMCTable+patJetPartons+genJetTable+genJetFlavourAssociation+genJetFlavourTable+genJetAK8Table+genJetAK8FlavourAssociation+genJetAK8FlavourTable+fatJetMCTable+genSubJetAK8Table+subjetMCTable)
+jetMC = cms.Sequence(jetMCTable+patJetPartons+JetFlavourAssociation+JetFlavourTable+genJetTable+genJetFlavourAssociation+genJetFlavourTable+genJetAK8Table+genJetAK8FlavourAssociation+genJetAK8FlavourTable+fatJetMCTable+genSubJetAK8Table+subjetMCTable)
 _jetMC_pre94X = jetMC.copy()
 _jetMC_pre94X.insert(_jetMC_pre94X.index(genJetFlavourTable),genJetFlavourAssociation)
 _jetMC_pre94X.remove(genSubJetAK8Table)
