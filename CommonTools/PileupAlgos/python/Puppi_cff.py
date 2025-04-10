@@ -71,6 +71,22 @@ puppi.algos.append(cms.PSet(
                        #   puppiAlgos = puppiForward
                        # )
 
+from Configuration.ProcessModifiers.mlpf_cff import mlpf
+from CommonTools.PileupAlgos.MLPFPUProducer_cfi import MLPFPUProducer
+mlpfpu = MLPFPUProducer.clone(
+                      UseDeltaZCutForPileup = False,
+                      DeltaZCut = primaryVertexAssociationJME.assignment.maxDzForPrimaryAssignment,
+                      EtaMinUseDeltaZ = primaryVertexAssociationJME.assignment.EtaMinUseDz,
+                      PtMaxCharged = primaryVertexAssociationJME.assignment.PtMaxCharged,
+                      NumOfPUVtxsForCharged = primaryVertexAssociationJME.assignment.NumOfPUVtxsForCharged,
+                      DeltaZCutForChargedFromPUVtxs = primaryVertexAssociationJME.assignment.DzCutForChargedFromPUVtxs,
+                      PtMaxPhotons = 20.,
+                      UseFromPV2Recovery = True,
+                      PtMinForFromPV2Recovery = 4.,
+                      clonePackedCands   = False, # should only be set to True for MiniAOD
+)
+mlpf.toReplaceWith(puppi, mlpfpu)
+
 from Configuration.Eras.Modifier_phase2_common_cff import phase2_common
 phase2_common.toModify(
     puppi,

@@ -204,13 +204,18 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
       float pred_e = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_ENERGY];
       pred_e = exp(pred_e) * inputs[0][ielem * NUM_ELEMENT_FEATURES + 5];
 
-      auto cand = makeCandidate(pred_pid, pred_charge, pred_pt, pred_eta, pred_sin_phi, pred_cos_phi, pred_e);
+      //get the predicted PU probability
+      //set to 0 now until new training is available
+      float pred_ispu = 0;
+
+      auto cand = makeCandidate(pred_pid, pred_charge, pred_pt, pred_eta, pred_sin_phi, pred_cos_phi, pred_e, pred_ispu);
       setCandidateRefs(cand, selected_elements, ielem);
       pOutputCandidateCollection.push_back(cand);
 
 #ifdef MLPF_DEBUG
       std::cout << "ielem=" << ielem << " pred: pid=" << cand.pdgId() << " E=" << cand.energy() << " pt=" << cand.pt()
-                << " eta=" << cand.eta() << " phi=" << cand.phi() << " charge=" << cand.charge() << std::endl;
+                << " eta=" << cand.eta() << " phi=" << cand.phi() << " charge=" << cand.charge()
+		<< "ispu=" << cand.MlpfPuPred() << std::endl;
 #endif
     }
   }  //loop over PFElements
