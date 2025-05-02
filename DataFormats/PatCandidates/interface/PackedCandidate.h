@@ -47,6 +47,7 @@ namespace pat {
           packedCovariance_(),
           packedPuppiweight_(0),
           packedPuppiweightNoLepDiff_(0),
+          packedMLPFPUweight_(0),
           rawCaloFraction_(0),
           rawHcalFraction_(0),
           caloFraction_(0),
@@ -77,6 +78,7 @@ namespace pat {
                              reco::VertexRef::key_type pvRefKey)
         : packedPuppiweight_(0),
           packedPuppiweightNoLepDiff_(0),
+	  packedMLPFPUweight_(0),
           rawCaloFraction_(0),
           rawHcalFraction_(0),
           caloFraction_(0),
@@ -115,6 +117,7 @@ namespace pat {
                              reco::VertexRef::key_type pvRefKey)
         : packedPuppiweight_(0),
           packedPuppiweightNoLepDiff_(0),
+	  packedMLPFPUweight_(0),
           rawCaloFraction_(0),
           rawHcalFraction_(0),
           caloFraction_(0),
@@ -153,6 +156,7 @@ namespace pat {
                              reco::VertexRef::key_type pvRefKey)
         : packedPuppiweight_(0),
           packedPuppiweightNoLepDiff_(0),
+	  packedMLPFPUweight_(0),
           rawCaloFraction_(0),
           rawHcalFraction_(0),
           caloFraction_(0),
@@ -194,6 +198,7 @@ namespace pat {
           packedCovariance_(iOther.packedCovariance_),
           packedPuppiweight_(iOther.packedPuppiweight_),
           packedPuppiweightNoLepDiff_(iOther.packedPuppiweightNoLepDiff_),
+          packedMLPFPUweight_(iOther.packedMLPFPUweight_),
           rawCaloFraction_(iOther.rawCaloFraction_),
           rawHcalFraction_(iOther.rawHcalFraction_),
           caloFraction_(iOther.caloFraction_),
@@ -237,6 +242,7 @@ namespace pat {
           packedCovariance_(iOther.packedCovariance_),
           packedPuppiweight_(iOther.packedPuppiweight_),
           packedPuppiweightNoLepDiff_(iOther.packedPuppiweightNoLepDiff_),
+          packedMLPFPUweight_(iOther.packedMLPFPUweight_),
           rawCaloFraction_(iOther.rawCaloFraction_),
           rawHcalFraction_(iOther.rawHcalFraction_),
           caloFraction_(iOther.caloFraction_),
@@ -282,6 +288,7 @@ namespace pat {
       packedCovariance_ = iOther.packedCovariance_;
       packedPuppiweight_ = iOther.packedPuppiweight_;
       packedPuppiweightNoLepDiff_ = iOther.packedPuppiweightNoLepDiff_;
+      packedMLPFPUweight_ = iOther.packedMLPFPUweight_,
       rawCaloFraction_ = iOther.rawCaloFraction_;
       rawHcalFraction_ = iOther.rawHcalFraction_;
       caloFraction_ = iOther.caloFraction_;
@@ -361,6 +368,7 @@ namespace pat {
       packedCovariance_ = iOther.packedCovariance_;
       packedPuppiweight_ = iOther.packedPuppiweight_;
       packedPuppiweightNoLepDiff_ = iOther.packedPuppiweightNoLepDiff_;
+      packedMLPFPUweight_ = iOther.packedMLPFPUweight_,
       rawCaloFraction_ = iOther.rawCaloFraction_;
       rawHcalFraction_ = iOther.rawHcalFraction_;
       caloFraction_ = iOther.caloFraction_;
@@ -946,6 +954,9 @@ namespace pat {
     float puppiWeight() const;                 /// Weight from full PUPPI
     float puppiWeightNoLep() const;            /// Weight from PUPPI removing leptons
 
+    void setMLPFPUWeight(float p);  /// Set both weights at once (with
+                                               /// option for only full PUPPI)
+    float MLPFPUWeight() const;                 /// Weight from full PUPPI
     // for the neutral fractions
     void setRawCaloFraction(float p);  /// Set the raw ECAL+HCAL energy over candidate
                                        /// energy for isolated charged hadrons
@@ -1065,6 +1076,7 @@ namespace pat {
 
     uint8_t packedPuppiweight_;
     int8_t packedPuppiweightNoLepDiff_;  // storing the DIFFERENCE of (all - "no
+    uint8_t packedMLPFPUweight_;
                                          // lep") for compression optimization
     uint8_t rawCaloFraction_;
     int8_t rawHcalFraction_;
