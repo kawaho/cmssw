@@ -626,6 +626,7 @@ def addPFCands(process, allPF = False, addAK4=False, addAK8=False):
                                                         variables = cms.PSet(CandVars,
                                                             puppiWeight = Var("puppiWeight()", float, doc="Puppi weight",precision=10),
                                                             puppiWeightNoLep = Var("puppiWeightNoLep()", float, doc="Puppi weight removing leptons",precision=10),
+                                                            mlpfpuWeight = Var("MLPFPUWeight()", float, doc="MLPF PU weight",precision=10),
                                                             vtxChi2 = Var("?hasTrackDetails()?vertexChi2():-1", float, doc="vertex chi2",precision=10),
                                                             trkChi2 = Var("?hasTrackDetails()?pseudoTrack().normalizedChi2():-1", float, doc="normalized trk chi2", precision=10),
                                                             dz = Var("?hasTrackDetails()?dz():-1", float, doc="pf dz", precision=10),

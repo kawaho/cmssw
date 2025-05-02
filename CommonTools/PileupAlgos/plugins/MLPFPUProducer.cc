@@ -74,6 +74,9 @@ private:
   int fVtxNdofCut;
   double fVtxZCut;
   double fMLPFPUCut;
+  bool fapplyCHS;
+  bool fapplyMLPF;
+
   std::vector<RecoObj> fRecoObjCollection;
 };
 
@@ -98,6 +101,8 @@ MLPFPUProducer::MLPFPUProducer(const edm::ParameterSet& iConfig) {
   fVtxNdofCut = iConfig.getParameter<int>("vtxNdofCut");
   fVtxZCut = iConfig.getParameter<double>("vtxZCut");
   fMLPFPUCut = iConfig.getParameter<double>("mlpfPUCut");
+  fapplyCHS = iConfig.getParameter<bool>("applyCHS");
+  fapplyMLPF = iConfig.getParameter<bool>("applyMLPF");
 
   tokenPFCandidates_ = consumes<CandidateView>(iConfig.getParameter<edm::InputTag>("candName"));
   tokenVertices_ = consumes<VertexCollection>(iConfig.getParameter<edm::InputTag>("vertexName"));
@@ -161,7 +166,10 @@ void MLPFPUProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) 
       double pD0 = -9999;
       uint pVtxId = 0;
       const pat::PackedCandidate* lPack = dynamic_cast<const pat::PackedCandidate*>(&aPF);
-
+      if (not fapplyCHS) { 
+        pReco.id = 0;
+	continue;
+      }
       if (fUseVertexAssociation) {
         const reco::VertexRef& PVOrig = associatedPV[reco::CandidatePtr(hPFProduct, iCand)];
         int quality = associationQuality[reco::CandidatePtr(hPFProduct, iCand)];
@@ -260,7 +268,7 @@ void MLPFPUProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) 
           }
         }
         // if undecided by CHS, use MLPF prediction
-        if (pReco.id==0) {
+        if (pReco.id==0 && fapplyMLPF) {
 	      pReco.id = pPF->mlpf_pu() < fMLPFPUCut? 1:2;
 	}
       } else if (lPack->vertexRef().isNonnull()) {
@@ -320,10 +328,10 @@ void MLPFPUProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) 
       const auto rParticle = fRecoObjCollection[i0];
 
       // Apply PUPPI CHS and MLPF Prediction
-      if (rParticle.id == 1)
-        lWeights.push_back(1);
-      else
+      if (rParticle.id == 2)
         lWeights.push_back(0);
+      else
+        lWeights.push_back(1);
     }
   } else {  
     //Use the existing weights
@@ -475,13 +483,13 @@ void MLPFPUProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptio
   desc.add<int>("vertexAssociationQuality", 0);
   desc.add<edm::InputTag>("vertexAssociation", edm::InputTag(""));
   desc.add<bool>("applyCHS", true);
+  desc.add<bool>("applyMLPF", true);
   desc.add<bool>("invertPuppi", false);
   desc.add<bool>("useExp", false);
   desc.add<double>("MinPuppiWeight", .01);
   desc.add<bool>("usePUProxyValue", false);
   desc.add<double>("mlpfPUCut", 0.5);
   desc.add<edm::InputTag>("PUProxyValue", edm::InputTag(""));
-
   descriptions.add("MLPFPUProducer", desc);
 }
 //define this as a plug-in
