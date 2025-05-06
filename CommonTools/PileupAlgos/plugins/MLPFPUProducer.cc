@@ -483,7 +483,7 @@ void MLPFPUProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptio
   desc.add<int>("vertexAssociationQuality", 0);
   desc.add<edm::InputTag>("vertexAssociation", edm::InputTag(""));
   desc.add<bool>("applyCHS", true);
-  desc.add<bool>("applyMLPF", true);
+  desc.add<bool>("applyMLPF", false);
   desc.add<bool>("invertPuppi", false);
   desc.add<bool>("useExp", false);
   desc.add<double>("MinPuppiWeight", .01);

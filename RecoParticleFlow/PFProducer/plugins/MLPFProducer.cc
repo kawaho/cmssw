@@ -12,7 +12,7 @@
 using namespace cms::Ort;
 
 //use this to switch on detailed print statements in MLPF
-//#define MLPF_DEBUG
+#define MLPF_DEBUG
 
 class MLPFProducer : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>> {
 public:
@@ -157,6 +157,9 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
   
       //get the most probable class PDGID
       pred_pid = pdgid_encoding.at(imax);
+#ifdef MLPF_DEBUG
+      std::cout << "pid: " << pred_pid << std::endl;
+#endif
     }
 
 #ifdef MLPF_DEBUG
@@ -214,7 +217,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
       float pred_ispu = exp(logit_pu)/(exp(logit_no_pu)+exp(logit_pu));
 
 #ifdef MLPF_DEBUG
-      std::cout << "pu: " << logit_no_pu << " " << logit_pu << std::endl;
+      std::cout << "pu logits: " << logit_no_pu << " " << logit_pu << std::endl;
       std::cout << "ispu prob: " << pred_ispu << std::endl;
 #endif
 

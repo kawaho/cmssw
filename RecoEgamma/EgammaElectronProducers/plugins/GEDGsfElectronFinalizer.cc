@@ -75,10 +75,13 @@ void GEDGsfElectronFinalizer::produce(edm::Event& event, const edm::EventSetup& 
   // prepare a map of PFCandidates having a valid GsfTrackRef to save time
   std::map<reco::GsfTrackRef, const reco::PFCandidate*> gsfPFMap;
   for (auto const& pfCand : *pfCandidateHandle) {
+    std::cout << "PF pt=" << pfCand.pt() << std::endl;
     // First check that the GsfTrack is non null
     if (pfCand.gsfTrackRef().isNonnull()) {
-      if (abs(pfCand.pdgId()) == 11)  // consider only the electrons
+      if (abs(pfCand.pdgId()) == 11) {  // consider only the electrons
         gsfPFMap[pfCand.gsfTrackRef()] = &pfCand;
+        std::cout << "gsfPF ele pt=" << pfCand.pt() << std::endl;
+      }
     }
   }
 
@@ -86,6 +89,7 @@ void GEDGsfElectronFinalizer::produce(edm::Event& event, const edm::EventSetup& 
   unsigned nele = gedElectronHandle->size();
   for (unsigned iele = 0; iele < nele; ++iele) {
     reco::GsfElectronRef myElectronRef(gedElectronHandle, iele);
+    std::cout << "GED ele pt=" << myElectronRef->pt() << std::endl;
 
     reco::GsfElectron newElectron(*myElectronRef);
     reco::GsfElectron::PflowIsolationVariables isoVariables;

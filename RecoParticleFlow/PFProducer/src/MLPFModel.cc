@@ -497,10 +497,13 @@ namespace reco::mlpf {
       cand.setMuonRef(muonRef);
     }
 
-    if (std::abs(cand.pdgId()) == 11 && elem->type() == reco::PFBlockElement::GSF) {
-      const auto* eltTrack = dynamic_cast<const reco::PFBlockElementGsfTrack*>(elem);
-      const auto& ref = eltTrack->GsftrackRef();
-      cand.setGsfTrackRef(ref);
+    if (std::abs(cand.pdgId()) == 11) {
+      if (elem->type() == reco::PFBlockElement::GSF) {
+        const auto* eltTrack = dynamic_cast<const reco::PFBlockElementGsfTrack*>(elem);
+        const auto& ref = eltTrack->GsftrackRef();
+        cand.setGsfTrackRef(ref);
+        cand.setVertex(ref->vertex());
+      }
     }
   }
 
