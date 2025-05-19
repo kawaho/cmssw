@@ -12,7 +12,7 @@
 using namespace cms::Ort;
 
 //use this to switch on detailed print statements in MLPF
-#define MLPF_DEBUG
+//#define MLPF_DEBUG
 
 class MLPFProducer : public edm::stream::EDProducer<edm::GlobalCache<ONNXRuntime>> {
 public:
