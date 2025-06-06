@@ -87,7 +87,6 @@ void GEDGsfElectronFinalizer::produce(edm::Event& event, const edm::EventSetup& 
   unsigned nele = gedElectronHandle->size();
   for (unsigned iele = 0; iele < nele; ++iele) {
     reco::GsfElectronRef myElectronRef(gedElectronHandle, iele);
-    std::cout << "GED ele pt=" << myElectronRef->pt() << std::endl;
 
     reco::GsfElectron newElectron(*myElectronRef);
     reco::GsfElectron::PflowIsolationVariables isoVariables;

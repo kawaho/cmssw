@@ -124,7 +124,6 @@ MLPFPUProducer::MLPFPUProducer(const edm::ParameterSet& iConfig) {
     ptokenCandidates_ = produces<reco::PFCandidateCollection>();
   }
 
-  std::cout << "MLPFPUCut " << fMLPFPUCut << std::endl;
 
 }
 // ------------------------------------------------------------------------------------------
