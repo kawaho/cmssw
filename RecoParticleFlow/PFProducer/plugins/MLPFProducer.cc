@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
@@ -8,6 +10,7 @@
 #include "RecoParticleFlow/PFProducer/interface/MLPFModel.h"
 
 #include "DataFormats/ParticleFlowReco/interface/PFBlockElementTrack.h"
+
 
 using namespace cms::Ort;
 
@@ -218,6 +221,15 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
       float pred_cos_phi = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_COS_PHI];
       float pred_e = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_ENERGY];
       pred_e = exp(pred_e) * inputs[0][ielem * NUM_ELEMENT_FEATURES + 5];
+     
+      if (elem->type() == reco::PFBlockElement::TRACK) {
+          const auto* eltTrack = dynamic_cast<const reco::PFBlockElementTrack*>(elem);
+	  if (eltTrack->trackRef().isNonnull()) {
+              pred_eta = eltTrack->trackRef()->eta();
+              pred_sin_phi = sin(eltTrack->trackRef()->phi());
+              pred_cos_phi = cos(eltTrack->trackRef()->phi());
+	  }
+      }
 
       //get the predicted PU probability
       const auto logit_no_pu = output_pu[ielem * 2 + 0];
