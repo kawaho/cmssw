@@ -202,6 +202,14 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
         }
       }
 
+      //do not attempt to do PID in the HF
+      if (elem->type() == reco::PFBlockElement::HFEM) {
+        pred_pid = 2;
+      }
+      else if (elem->type() == reco::PFBlockElement::HFHAD) {
+        pred_pid = 1;
+      }
+
       //get the predicted momentum components from the model
       float pred_pt = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_PT];
       pred_pt = exp(pred_pt) * inputs[0][ielem * NUM_ELEMENT_FEATURES + 1]; 
