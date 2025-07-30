@@ -84,7 +84,7 @@ mlpfpu = MLPFPUProducer.clone(
                       UseFromPV2Recovery = True,
                       PtMinForFromPV2Recovery = 4.,
                       clonePackedCands   = False, # should only be set to True for MiniAOD
-                      mlpfPUCut = 0.1,
+                      mlpfPUCut = 0.4,
                       applyCHS = True,
                       applyMLPF = False
 )
