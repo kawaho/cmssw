@@ -18,6 +18,9 @@
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
+#include "FWCore/ParameterSet/interface/FileInPath.h"
+#include "correction.h"
+
 #include <memory>
 
 // ------------------------------------------------------------------------------------------
@@ -74,6 +77,7 @@ private:
   int fVtxNdofCut;
   double fVtxZCut;
   double fMLPFPUCut;
+  edm::FileInPath fPUthres;
   bool fapplyCHS;
   bool fapplyMLPF;
 
@@ -101,6 +105,7 @@ MLPFPUProducer::MLPFPUProducer(const edm::ParameterSet& iConfig) {
   fVtxNdofCut = iConfig.getParameter<int>("vtxNdofCut");
   fVtxZCut = iConfig.getParameter<double>("vtxZCut");
   fMLPFPUCut = iConfig.getParameter<double>("mlpfPUCut");
+  fPUthres = iConfig.getParameter<edm::FileInPath>("PUthres");
   fapplyCHS = iConfig.getParameter<bool>("applyCHS");
   fapplyMLPF = iConfig.getParameter<bool>("applyMLPF");
 
@@ -268,9 +273,12 @@ void MLPFPUProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) 
               pReco.id = 1;
           }
         }
-        // if undecided by CHS, use MLPF prediction
-        if (pReco.id==0 && fapplyMLPF) {
-	      pReco.id = pPF->mlpf_pu() < fMLPFPUCut? 1:2;
+        // if neutral, use MLPF prediction
+        if ((std::abs(pReco.charge) == 0) && fapplyMLPF) {
+              auto cset = correction::CorrectionSet::from_file(fPUthres.fullPath());
+              auto corr = cset->at("80TPR");
+	      float threshold = corr->evaluate({std::abs(pReco.eta), pReco.pdgId, pReco.pt});
+	      pReco.id = pPF->mlpf_pu() < threshold ? 1:2; //applying a pdgid, pt, eta dependent threshold instead of a single fMLPFPUCut
 	}
       } else if (lPack->vertexRef().isNonnull()) {
         pDZ = lPack->dz();
@@ -490,6 +498,7 @@ void MLPFPUProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptio
   desc.add<double>("MinPuppiWeight", .01);
   desc.add<bool>("usePUProxyValue", false);
   desc.add<double>("mlpfPUCut", 0.5);
+  desc.add<edm::FileInPath>("PUthres", edm::FileInPath("RecoParticleFlow/PFProducer/data/mlpf/mlpfpu_threshold_80TPR.json"));
   desc.add<edm::InputTag>("PUProxyValue", edm::InputTag(""));
   descriptions.add("MLPFPUProducer", desc);
 }
