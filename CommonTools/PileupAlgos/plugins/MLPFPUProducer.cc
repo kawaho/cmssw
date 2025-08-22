@@ -18,6 +18,9 @@
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
+#include "FWCore/ParameterSet/interface/FileInPath.h"
+#include "correction.h"
+
 #include <memory>
 
 // ------------------------------------------------------------------------------------------
@@ -62,6 +65,7 @@ private:
   double fDZCut;
   double fEtaMinUseDZ;
   double fPtMaxCharged;
+  double fPtMaxNeutrals;
   double fEtaMaxCharged;
   double fPtMaxPhotons;
   double fEtaMaxPhotons;
@@ -74,6 +78,8 @@ private:
   int fVtxNdofCut;
   double fVtxZCut;
   double fMLPFPUCut;
+  edm::FileInPath fPUThresFile;
+  std::string fPUThresSet;
   bool fapplyCHS;
   bool fapplyMLPF;
 
@@ -90,6 +96,7 @@ MLPFPUProducer::MLPFPUProducer(const edm::ParameterSet& iConfig) {
   fEtaMinUseDZ = iConfig.getParameter<double>("EtaMinUseDeltaZ");
   fPtMaxCharged = iConfig.getParameter<double>("PtMaxCharged");
   fEtaMaxCharged = iConfig.getParameter<double>("EtaMaxCharged");
+  fPtMaxNeutrals = iConfig.getParameter<double>("PtMaxNeutrals");
   fPtMaxPhotons = iConfig.getParameter<double>("PtMaxPhotons");
   fEtaMaxPhotons = iConfig.getParameter<double>("EtaMaxPhotons");
   fPtMinForFromPV2Recovery = iConfig.getParameter<double>("PtMinForFromPV2Recovery");
@@ -101,6 +108,8 @@ MLPFPUProducer::MLPFPUProducer(const edm::ParameterSet& iConfig) {
   fVtxNdofCut = iConfig.getParameter<int>("vtxNdofCut");
   fVtxZCut = iConfig.getParameter<double>("vtxZCut");
   fMLPFPUCut = iConfig.getParameter<double>("mlpfPUCut");
+  fPUThresFile = iConfig.getParameter<edm::FileInPath>("PUThresFile");
+  fPUThresSet = iConfig.getParameter<std::string>("PUThresSet");
   fapplyCHS = iConfig.getParameter<bool>("applyCHS");
   fapplyMLPF = iConfig.getParameter<bool>("applyMLPF");
 
@@ -268,9 +277,14 @@ void MLPFPUProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) 
               pReco.id = 1;
           }
         }
-        // if undecided by CHS, use MLPF prediction
-        if (pReco.id==0 && fapplyMLPF) {
-	      pReco.id = pPF->mlpf_pu() < fMLPFPUCut? 1:2;
+        // if neutral, use MLPF prediction
+        if ((std::abs(pReco.charge) == 0) && fapplyMLPF) {
+              auto cset = correction::CorrectionSet::from_file(fPUThresFile.fullPath());
+              auto corr = cset->at(fPUThresSet);
+	      float threshold = corr->evaluate({std::abs(pReco.eta), pReco.pdgId, pReco.pt});
+	      //applying a pdgid, pt, eta dependent threshold instead of a single fMLPFPUCut
+	      //we keep any neutrals with pt > fPtMaxNeutrals
+	      pReco.id = ((pPF->mlpf_pu() < threshold) | (pReco.pt > fPtMaxNeutrals)) ? 1:2;
 	}
       } else if (lPack->vertexRef().isNonnull()) {
         pDZ = lPack->dz();
@@ -468,7 +482,7 @@ void MLPFPUProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptio
   desc.add<double>("EtaMaxCharged", 99999.);
   desc.add<double>("PtMaxPhotons", -1.);
   desc.add<double>("EtaMaxPhotons", 2.5);
-  desc.add<double>("PtMaxNeutrals", 200.);
+  desc.add<double>("PtMaxNeutrals", 15.);
   desc.add<double>("PtMaxNeutralsStartSlope", 0.);
   desc.add<double>("PtMinForFromPV2Recovery", 0.);
   desc.add<uint>("NumOfPUVtxsForCharged", 0);
@@ -490,6 +504,8 @@ void MLPFPUProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptio
   desc.add<double>("MinPuppiWeight", .01);
   desc.add<bool>("usePUProxyValue", false);
   desc.add<double>("mlpfPUCut", 0.5);
+  desc.add<edm::FileInPath>("PUThresFile", edm::FileInPath("RecoParticleFlow/PFProducer/data/mlpf/mlpfpu_threshold_80TPR.json"));
+  desc.add<std::string>("PUThresSet", "80TPR");
   desc.add<edm::InputTag>("PUProxyValue", edm::InputTag(""));
   descriptions.add("MLPFPUProducer", desc);
 }

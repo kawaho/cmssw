@@ -8,4 +8,5 @@
   <use name="CommonTools/PileupAlgos"/>
   <use name="fastjet"/>
   <use name="fastjet-contrib"/>
+  <use name="correctionlib"/>
 </library>
