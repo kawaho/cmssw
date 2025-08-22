@@ -80,11 +80,12 @@ mlpfpu = MLPFPUProducer.clone(
                       PtMaxCharged = primaryVertexAssociationJME.assignment.PtMaxCharged,
                       NumOfPUVtxsForCharged = primaryVertexAssociationJME.assignment.NumOfPUVtxsForCharged,
                       DeltaZCutForChargedFromPUVtxs = primaryVertexAssociationJME.assignment.DzCutForChargedFromPUVtxs,
-                      PtMaxPhotons = 20.,
+                      PtMaxNeutrals = 15,
                       UseFromPV2Recovery = True,
                       PtMinForFromPV2Recovery = 4.,
                       clonePackedCands   = False, # should only be set to True for MiniAOD
-                      PUthres = "RecoParticleFlow/PFProducer/data/mlpf/mlpfpu_threshold_80TPR.json",
+                      PUThresFile = "RecoParticleFlow/PFProducer/data/mlpf/mlpfpu_threshold_80TPR.json",
+                      PUThresSet = "80TPR",
                       applyCHS = True,
                       applyMLPF = True
 )
