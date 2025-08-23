@@ -285,6 +285,7 @@ void MLPFPUProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSetup) 
 	      //applying a pdgid, pt, eta dependent threshold instead of a single fMLPFPUCut
 	      //we keep any neutrals with pt > fPtMaxNeutrals
 	      pReco.id = ((pPF->mlpf_pu() < threshold) | (pReco.pt > fPtMaxNeutrals)) ? 1:2;
+              std::cout << "pid=" << pReco.pdgId << " pt=" << pReco.pt << " abs(eta)=" << std::abs(pReco.eta) << " thresh=" << threshold << " pu=" << pPF->mlpf_pu() << " id=" << pReco.id << std::endl;
 	}
       } else if (lPack->vertexRef().isNonnull()) {
         pDZ = lPack->dz();
