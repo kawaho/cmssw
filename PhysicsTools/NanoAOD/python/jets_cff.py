@@ -618,7 +618,7 @@ genJetFlavourTable = cms.EDProducer("GenJetFlavourTableProducer",
     src = genJetTable.src,
     cut = genJetTable.cut,
     deltaR = cms.double(0.1),
-    jetFlavourInfos = cms.InputTag("slimmedGenJetsFlavourInfos"),
+    jetFlavourInfos = cms.InputTag("genJetFlavourAssociation"),
 )
 
 genJetAK8Table = cms.EDProducer("SimpleCandidateFlatTableProducer",

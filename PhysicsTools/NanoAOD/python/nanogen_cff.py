@@ -96,10 +96,16 @@ def customizeNanoGEN(process):
     process.patJetPartons.particles = "genParticles"
     process.particleLevel.src = "generatorSmeared"
 
-    process.genJetTable.src = "ak4GenJets"
+    process.genJetTable.src = "ak4GenJetsNoNu"#ak4GenJets"
     process.genJetAK8Table.src = "ak8GenJets"
     process.tauGenJets.GenParticles = "genParticles"
     process.genVisTaus.srcGenParticles = "genParticles"
+
+    process.genAK4ConstituentsTable = cms.EDProducer("GenJetConstituentTableProducer",
+                                                     jets = cms.InputTag("ak4GenJetsNoNu"), # Note: The name has "Constituents" in it, but these are the jets
+                                                     name = cms.string("GenJetCands"))
+
+    process.nanogenSequence.insert(22, process.genAK4ConstituentsTable)
 
     # In case customizeNanoGENFromMini has already been called
     process.nanogenSequence.remove(process.genParticles2HepMCHiggsVtx)
