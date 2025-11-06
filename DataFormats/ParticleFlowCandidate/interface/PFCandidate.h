@@ -368,10 +368,6 @@ namespace reco {
     float dnn_gamma() const { return dnn_gamma_; }
     void set_dnn_gamma(float mva) { dnn_gamma_ = mva; }
 
-    // set MLPF PU prediction
-    float mlpf_pu() const { return mlpf_pu_; }
-    void set_mlpf_pu(float mva) { mlpf_pu_ = mva; }
-
     /// mva for neutral hadron - gamma discrimination
     float mva_gamma_nh() const { return mva_gamma_nh_; }
 
@@ -538,9 +534,6 @@ namespace reco {
 
     // DNN for gamma PFid
     float dnn_gamma_;
-
-    // MLPF PU prediction
-    float mlpf_pu_;
 
     /// position at ECAL entrance, from the PFRecTrack
     math::XYZPointF positionAtECALEntrance_;

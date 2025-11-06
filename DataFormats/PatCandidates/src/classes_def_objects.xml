@@ -16,9 +16,7 @@
   <class name="pat::Lepton<reco::BaseTau>" />
 
   <!-- PAT Objects, and embedded data  -->
-  <class name="pat::Electron"  ClassVersion="40">
-   <version ClassVersion="40" checksum="1251314096"/>
-   <version ClassVersion="39" checksum="452990490"/>
+  <class name="pat::Electron"  ClassVersion="38">
    <version ClassVersion="38" checksum="1251314096"/>
    <version ClassVersion="37" checksum="4284869321"/>
    <version ClassVersion="36" checksum="199321903"/>
@@ -103,9 +101,7 @@
     <![CDATA[ cachedIP_ = onfile.cachedIP_[1] + 2*onfile.cachedIP_[2] + 4*onfile.cachedIP_[3] + 8*onfile.cachedIP_[4]; ]]>
   </ioread>
 
-  <class name="pat::Tau"  ClassVersion="21">
-   <version ClassVersion="21" checksum="4141787547"/>
-   <version ClassVersion="20" checksum="171697261"/>
+  <class name="pat::Tau"  ClassVersion="19">
    <version ClassVersion="19" checksum="4141787547"/>
    <version ClassVersion="18" checksum="3279584614"/>
    <version ClassVersion="17" checksum="2561486007"/>
@@ -229,9 +225,7 @@
   </ioread>
 
   <class name="std::vector<pat::tau::TauPFEssential>" />
-  <class name="pat::Photon"  ClassVersion="24">
-   <version ClassVersion="24" checksum="1415449268"/>
-   <version ClassVersion="23" checksum="3540550292"/>
+  <class name="pat::Photon"  ClassVersion="22">
    <version ClassVersion="22" checksum="1415449268"/>
    <version ClassVersion="21" checksum="3263223164"/>
    <version ClassVersion="20" checksum="1579185367"/>
@@ -258,9 +252,7 @@
              newObj->setPflowIsolationVariables(pfIsoVar);]]>
   </ioread>
 
-  <class name="pat::Jet"  ClassVersion="19">
-   <version ClassVersion="19" checksum="739868501"/>
-   <version ClassVersion="18" checksum="2148941854"/>
+  <class name="pat::Jet"  ClassVersion="17">
    <version ClassVersion="17" checksum="739868501"/>
    <field name="daughtersTemp_" transient="true"/>
    <version ClassVersion="16" checksum="4069285947"/>
@@ -285,9 +277,7 @@
   <ioread sourceClass = "pat::Jet" version="[1-]" targetClass="pat::Jet" source="" target="daughtersTemp_">
     <![CDATA[daughtersTemp_.reset();]]>
   </ioread>
-  <class name="pat::MET"  ClassVersion="19">
-   <version ClassVersion="19" checksum="1526897576"/>
-   <version ClassVersion="18" checksum="1561367672"/>
+  <class name="pat::MET"  ClassVersion="17">
     <version ClassVersion="17" checksum="1526897576"/>
     <version ClassVersion="16" checksum="2416242778"/>
     <field name="corMap_" transient="true"/>
@@ -320,8 +310,7 @@
    <version ClassVersion="11" checksum="3492108938"/>
    <version ClassVersion="10" checksum="417284221"/>
   </class>
-  <class name="pat::PFParticle"  ClassVersion="17">
-   <version ClassVersion="17" checksum="3216247286"/>
+  <class name="pat::PFParticle"  ClassVersion="16">
    <version ClassVersion="16" checksum="4057492004"/>
    <version ClassVersion="15" checksum="1485536104"/>
    <version ClassVersion="14" checksum="2795911745"/>
@@ -346,9 +335,7 @@
   <class name="pat::PackedCandidate::PackedCovariance" ClassVersion="3">
    <version ClassVersion="3" checksum="3320406063"/>
   </class>
-  <class name="pat::PackedCandidate" ClassVersion="37">
-   <version ClassVersion="37" checksum="3598984192"/>
-   <version ClassVersion="36" checksum="1018281065"/>
+  <class name="pat::PackedCandidate" ClassVersion="35">
    <version ClassVersion="35" checksum="2065846728"/>
    <version ClassVersion="34" checksum="3953181632"/>
    <version ClassVersion="33" checksum="1092680546"/>
@@ -447,9 +434,7 @@
    </ioread>
 
 
-  <class name="pat::PackedGenParticle" ClassVersion="14">
-   <version ClassVersion="14" checksum="2626711017"/>
-   <version ClassVersion="13" checksum="433216438"/>
+  <class name="pat::PackedGenParticle" ClassVersion="12">
     <version ClassVersion="12" checksum="2626711017"/>
     <version ClassVersion="11" checksum="25552245"/>
     <version ClassVersion="10" checksum="389883266"/>
@@ -664,9 +649,7 @@
   <class name="pat::PATTauDiscriminatorBase">
     <field name="transientVector_" transient="true"/>
   </class>  
-  <class name="pat::PATTauDiscriminator"  ClassVersion="5">
-   <version ClassVersion="5" checksum="2916098408"/>
-   <version ClassVersion="4" checksum="2485577285"/>
+  <class name="pat::PATTauDiscriminator"  ClassVersion="3">
    <version ClassVersion="3" checksum="2916098408"/>  
   </class>  
   <class name="pat::PATTauDiscriminatorRef"/>

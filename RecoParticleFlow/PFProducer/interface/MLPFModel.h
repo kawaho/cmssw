@@ -179,8 +179,7 @@ namespace reco::mlpf {
                                   float pred_eta,
                                   float pred_sin_phi,
                                   float pred_cos_phi,
-				  float pred_e,
-                                  float pred_ispu);
+				  float pred_e);
 
   const std::vector<const reco::PFBlockElement*> getPFElements(const reco::PFBlockCollection& blocks);
 
