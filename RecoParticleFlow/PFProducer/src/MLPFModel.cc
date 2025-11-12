@@ -418,8 +418,7 @@ namespace reco::mlpf {
                                   float pred_eta,
                                   float pred_sin_phi,
                                   float pred_cos_phi,
-				  float pred_e,
-				  float pred_ispu) {
+				  float pred_e) {
     float pred_phi = std::atan2(pred_sin_phi, pred_cos_phi);
 
     //set the charge to +1 or -1 for PFCandidates that are charged, according to the sign of the predicted charge
@@ -451,7 +450,6 @@ namespace reco::mlpf {
     if (pred_pid == 211)
       cand.setMass(PI_MASS);
 
-    cand.set_mlpf_pu(pred_ispu);
     //cand.setPdgId(pred_pid);
     //cand.setCharge(charge);
 

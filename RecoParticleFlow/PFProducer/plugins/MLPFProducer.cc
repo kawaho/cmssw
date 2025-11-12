@@ -11,7 +11,6 @@
 
 #include "DataFormats/ParticleFlowReco/interface/PFBlockElementTrack.h"
 
-
 using namespace cms::Ort;
 
 //use this to switch on detailed print statements in MLPF
@@ -109,7 +108,6 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
   const auto& output_binary = outputs[0];
   const auto& output_pid = outputs[1];
   const auto& output_p4 = outputs[2];
-  const auto& output_pu = outputs[3];
 
 #ifdef MLPF_DEBUG
   std::cout << "output_binary=" << output_binary.size() << std::endl;  
@@ -120,9 +118,6 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
   std::cout << "output_p4=" << output_p4.size() << std::endl;  
   assert(output_p4.size() == tensor_size * NUM_OUTPUT_FEATURES_P4);
-
-  std::cout << "output_pu=" << output_pu.size() << std::endl;
-  assert(output_pu.size() == tensor_size * 2);
 #endif
 
   std::vector<reco::PFCandidate> pOutputCandidateCollection;
@@ -231,24 +226,13 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 	  }
       }
 
-      //get the predicted PU probability
-      const auto logit_no_pu = output_pu[ielem * 2 + 0];
-      const auto logit_pu = output_pu[ielem * 2 + 1];
-      float pred_ispu = exp(logit_pu)/(exp(logit_no_pu)+exp(logit_pu));
-
-#ifdef MLPF_DEBUG
-      std::cout << "pu logits: " << logit_no_pu << " " << logit_pu << std::endl;
-      std::cout << "ispu prob: " << pred_ispu << std::endl;
-#endif
-
-      auto cand = makeCandidate(pred_pid, pred_charge, pred_pt, pred_eta, pred_sin_phi, pred_cos_phi, pred_e, pred_ispu);
+      auto cand = makeCandidate(pred_pid, pred_charge, pred_pt, pred_eta, pred_sin_phi, pred_cos_phi, pred_e);
       setCandidateRefs(cand, selected_elements, ielem);
       pOutputCandidateCollection.push_back(cand);
 
 #ifdef MLPF_DEBUG
       std::cout << "ielem=" << ielem << " pred: pid=" << cand.pdgId() << " E=" << cand.energy() << " pt=" << cand.pt()
-                << " eta=" << cand.eta() << " phi=" << cand.phi() << " charge=" << cand.charge()
-		<< " ispu=" << cand.mlpf_pu() << std::endl;
+                << " eta=" << cand.eta() << " phi=" << cand.phi() << " charge=" << cand.charge() << std::endl;
 #endif
     }
   }  //loop over PFElements

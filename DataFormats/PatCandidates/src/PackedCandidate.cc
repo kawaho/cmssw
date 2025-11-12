@@ -424,14 +424,6 @@ bool pat::PackedCandidate::longLived() const { return false; }
 
 bool pat::PackedCandidate::massConstraint() const { return false; }
 
-void pat::PackedCandidate::setMLPFPUWeight(float p) {
-  packedMLPFPUweight_ = std::numeric_limits<uint8_t>::max() * p;
-}
-
-float pat::PackedCandidate::MLPFPUWeight() const {
-  return 1.f * packedMLPFPUweight_ / std::numeric_limits<uint8_t>::max();
-}
-
 // puppiweight
 void pat::PackedCandidate::setPuppiWeight(float p, float p_nolep) {
   // Set both weights at once to avoid misconfigured weights if called in the

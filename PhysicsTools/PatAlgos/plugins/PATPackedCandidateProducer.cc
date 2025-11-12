@@ -401,7 +401,6 @@ void pat::PATPackedCandidateProducer::produce(edm::StreamID, edm::Event &iEvent,
       float puppiWeightNoLepVal = (*puppiWeightNoLep)[pkref];
       outPtrP->back().setPuppiWeight(puppiWeightVal, puppiWeightNoLepVal);
     }
-    outPtrP->back().setMLPFPUWeight(cand.mlpf_pu());
 
     if (storeTiming_) {
       if (timeFromValueMap_) {
