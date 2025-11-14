@@ -77,9 +77,8 @@ void GEDGsfElectronFinalizer::produce(edm::Event& event, const edm::EventSetup& 
   for (auto const& pfCand : *pfCandidateHandle) {
     // First check that the GsfTrack is non null
     if (pfCand.gsfTrackRef().isNonnull()) {
-      if (abs(pfCand.pdgId()) == 11) {  // consider only the electrons
+      if (abs(pfCand.pdgId()) == 11)  // consider only the electrons
         gsfPFMap[pfCand.gsfTrackRef()] = &pfCand;
-      }
     }
   }
 
