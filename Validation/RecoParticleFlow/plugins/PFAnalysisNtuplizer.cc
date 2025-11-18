@@ -106,6 +106,7 @@ private:
       const std::vector<reco::PFBlock>& pfBlocks);
 
   void clearVariables();
+  void fillVariables(const reco::mlpf::ElementFeatures& props);
 
   // ----------member data ---------------------------
 
@@ -119,6 +120,7 @@ private:
   edm::EDGetTokenT<reco::RecoToSimCollection> tracks_recotosim_;
   edm::EDGetTokenT<reco::RecoToSimCollection> gsf_recotosim_;
   edm::EDGetTokenT<edm::View<reco::GsfElectron>> gsfElectrons_;
+  edm::EDGetTokenT<reco::VertexCollection> vertices_;
   edm::EDGetTokenT<edm::View<reco::GenJet>> genJets_;
   edm::EDGetTokenT<edm::View<reco::GenMET>> genMETs_;
 
@@ -259,9 +261,9 @@ private:
   vector<float> element_lambdaerror_;
   vector<float> element_theta_;
   vector<float> element_thetaerror_;
-  vector<float> element_vx_;
-  vector<float> element_vy_;
-  vector<float> element_vz_;
+  vector<float> element_pca_x_;
+  vector<float> element_pca_y_;
+  vector<float> element_pca_z_;
   vector<float> element_time_;
   vector<float> element_timeerror_;
   vector<float> element_etaerror1_;
@@ -272,6 +274,23 @@ private:
   vector<float> element_phierror2_;
   vector<float> element_phierror3_;
   vector<float> element_phierror4_;
+  vector<float> element_vtx_x_;
+  vector<float> element_vtx_y_;
+  vector<float> element_vtx_z_;
+  vector<float> element_ntracks_;
+  vector<float> element_v_normalized_chi2_;
+  vector<float> element_vx_;
+  vector<float> element_vy_;
+  vector<float> element_vz_;
+  vector<float> element_vt_;
+  vector<float> element_vx_err_;
+  vector<float> element_vy_err_;
+  vector<float> element_vz_err_;
+  vector<float> element_vt_err_;
+  vector<float> element_vpx_;
+  vector<float> element_vpy_;
+  vector<float> element_vpz_;
+  vector<float> element_ve_;
 
   vector<int> element_distance_i_;
   vector<int> element_distance_j_;
@@ -312,6 +331,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   gsftracks_ = consumes<edm::View<reco::Track>>(edm::InputTag("electronGsfTracks"));
   saveHits = iConfig.getUntrackedParameter<bool>("saveHits", false);
   gsfElectrons_ = consumes<edm::View<reco::GsfElectron>>(edm::InputTag("gedGsfElectrons"));
+  vertices_ = consumes<reco::VertexCollection>(edm::InputTag("offlinePrimaryVertices"));
   genJets_ = consumes<edm::View<reco::GenJet>>(edm::InputTag("ak4GenJets"));
   genMETs_ = consumes<edm::View<reco::GenMET>>(edm::InputTag("genMetTrue"));
 
@@ -424,9 +444,9 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("element_lambdaerror", &element_lambdaerror_);
   t_->Branch("element_theta", &element_theta_);
   t_->Branch("element_thetaerror", &element_thetaerror_);
-  t_->Branch("element_vx", &element_vx_);
-  t_->Branch("element_vy", &element_vy_);
-  t_->Branch("element_vz", &element_vz_);
+  t_->Branch("element_pca_x", &element_pca_x_);
+  t_->Branch("element_pca_y", &element_pca_y_);
+  t_->Branch("element_pca_z", &element_pca_z_);
   t_->Branch("element_time", &element_time_);
   t_->Branch("element_timeerror", &element_timeerror_);
   t_->Branch("element_etaerror1", &element_etaerror1_);
@@ -437,6 +457,23 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("element_phierror2", &element_phierror2_);
   t_->Branch("element_phierror3", &element_phierror3_);
   t_->Branch("element_phierror4", &element_phierror4_);
+  t_->Branch("element_vtx_x", &element_vtx_x_);
+  t_->Branch("element_vtx_y", &element_vtx_y_);
+  t_->Branch("element_vtx_z", &element_vtx_z_);
+  t_->Branch("element_ntracks", &element_ntracks_);
+  t_->Branch("element_v_normalized_chi2", &element_v_normalized_chi2_);
+  t_->Branch("element_vx", &element_vx_);
+  t_->Branch("element_vy", &element_vy_);
+  t_->Branch("element_vz", &element_vz_);
+  t_->Branch("element_vt", &element_vt_);
+  t_->Branch("element_vx_err", &element_vx_err_);
+  t_->Branch("element_vy_err", &element_vy_err_);
+  t_->Branch("element_vz_err", &element_vz_err_);
+  t_->Branch("element_vt_err", &element_vt_err_);
+  t_->Branch("element_vpx", &element_vpx_);
+  t_->Branch("element_vpy", &element_vpy_);
+  t_->Branch("element_vpz", &element_vpz_);
+  t_->Branch("element_ve", &element_ve_);
 
   //Distance matrix between PF elements
   t_->Branch("element_distance_i", &element_distance_i_);
@@ -583,9 +620,9 @@ void PFAnalysis::clearVariables() {
   element_lambdaerror_.clear();
   element_theta_.clear();
   element_thetaerror_.clear();
-  element_vx_.clear();
-  element_vy_.clear();
-  element_vz_.clear();
+  element_pca_x_.clear();
+  element_pca_y_.clear();
+  element_pca_z_.clear();
   element_time_.clear();
   element_timeerror_.clear();
   element_etaerror1_.clear();
@@ -596,6 +633,23 @@ void PFAnalysis::clearVariables() {
   element_phierror2_.clear();
   element_phierror3_.clear();
   element_phierror4_.clear();
+  element_vtx_x_.clear();
+  element_vtx_y_.clear();
+  element_vtx_z_.clear();
+  element_ntracks_.clear();
+  element_v_normalized_chi2_.clear();
+  element_vx_.clear();
+  element_vy_.clear();
+  element_vz_.clear();
+  element_vt_.clear();
+  element_vx_err_.clear();
+  element_vy_err_.clear();
+  element_vz_err_.clear();
+  element_vt_err_.clear();
+  element_vpx_.clear();
+  element_vpy_.clear();
+  element_vpz_.clear();
+  element_ve_.clear();
 
   element_distance_i_.clear();
   element_distance_j_.clear();
@@ -611,6 +665,80 @@ void PFAnalysis::clearVariables() {
   pfcandidate_pdgid_.clear();
 
 }  //clearVariables
+
+void PFAnalysis::fillVariables(const reco::mlpf::ElementFeatures& props) {
+  element_pt_.push_back(props.pt);
+  element_pterror_.push_back(props.pterror);
+  element_px_.push_back(props.px);
+  element_py_.push_back(props.py);
+  element_pz_.push_back(props.pz);
+  element_sigma_x_.push_back(props.sigma_x);
+  element_sigma_y_.push_back(props.sigma_y);
+  element_sigma_z_.push_back(props.sigma_z);
+  element_deltap_.push_back(props.deltap);
+  element_sigmadeltap_.push_back(props.sigmadeltap);
+  element_eta_.push_back(props.eta);
+  element_etaerror_.push_back(props.etaerror);
+  element_phi_.push_back(props.phi);
+  element_phierror_.push_back(props.phierror);
+  element_energy_.push_back(props.energy);
+  element_corr_energy_.push_back(props.corr_energy);
+  element_corr_energy_err_.push_back(props.corr_energy_err);
+  element_eta_ecal_.push_back(props.eta_ecal);
+  element_phi_ecal_.push_back(props.phi_ecal);
+  element_eta_hcal_.push_back(props.eta_hcal);
+  element_phi_hcal_.push_back(props.phi_hcal);
+  element_charge_.push_back(props.charge);
+  element_type_.push_back(props.type);
+  element_layer_.push_back(props.layer);
+  element_depth_.push_back(props.depth);
+  element_trajpoint_.push_back(props.trajpoint);
+  element_muon_dt_hits_.push_back(props.muon_dt_hits);
+  element_muon_csc_hits_.push_back(props.muon_csc_hits);
+  element_muon_type_.push_back(props.muon_type);
+  element_cluster_flags_.push_back(props.cluster_flags);
+  element_gsf_electronseed_trkorecal_.push_back(props.gsf_electronseed_trkorecal);
+  element_gsf_electronseed_dnn1_.push_back(props.gsf_electronseed_dnn1);
+  element_gsf_electronseed_dnn2_.push_back(props.gsf_electronseed_dnn2);
+  element_gsf_electronseed_dnn3_.push_back(props.gsf_electronseed_dnn3);
+  element_gsf_electronseed_dnn4_.push_back(props.gsf_electronseed_dnn4);
+  element_gsf_electronseed_dnn5_.push_back(props.gsf_electronseed_dnn5);
+  element_num_hits_.push_back(props.num_hits);
+  element_lambda_.push_back(props.lambda);
+  element_lambdaerror_.push_back(props.lambdaerror);
+  element_theta_.push_back(props.theta);
+  element_thetaerror_.push_back(props.thetaerror);
+  element_pca_x_.push_back(props.pca_x);
+  element_pca_y_.push_back(props.pca_y);
+  element_pca_z_.push_back(props.pca_z);
+  element_time_.push_back(props.time);
+  element_timeerror_.push_back(props.timeerror);
+  element_etaerror1_.push_back(props.etaerror1);
+  element_etaerror2_.push_back(props.etaerror2);
+  element_etaerror3_.push_back(props.etaerror3);
+  element_etaerror4_.push_back(props.etaerror4);
+  element_phierror1_.push_back(props.phierror1);
+  element_phierror2_.push_back(props.phierror2);
+  element_phierror3_.push_back(props.phierror3);
+  element_phierror4_.push_back(props.phierror4);
+  element_vtx_x_.push_back(props.vtx_x);
+  element_vtx_y_.push_back(props.vtx_y);
+  element_vtx_z_.push_back(props.vtx_z);
+  element_ntracks_.push_back(props.ntracks);
+  element_v_normalized_chi2_.push_back(props.v_normalized_chi2);
+  element_vx_.push_back(props.vx);
+  element_vy_.push_back(props.vy);
+  element_vz_.push_back(props.vz);
+  element_vt_.push_back(props.vt);
+  element_vx_err_.push_back(props.vx_err);
+  element_vy_err_.push_back(props.vy_err);
+  element_vz_err_.push_back(props.vz_err);
+  element_vt_err_.push_back(props.vt_err);
+  element_vpx_.push_back(props.vpx);
+  element_vpy_.push_back(props.vpy);
+  element_vpz_.push_back(props.vpz);
+  element_ve_.push_back(props.ve);
+}
 
 void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
   clearVariables();
@@ -644,6 +772,10 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
   edm::Handle<edm::View<reco::GsfElectron>> gsfElectronHandle;
   iEvent.getByToken(gsfElectrons_, gsfElectronHandle);
   const edm::View<reco::GsfElectron>& gsfElectrons = *gsfElectronHandle;
+
+  edm::Handle<reco::VertexCollection> vertexHandle;
+  iEvent.getByToken(vertices_, vertexHandle);
+  const reco::VertexCollection& primaryVertices = *vertexHandle;
 
   edm::Handle<std::vector<reco::GenParticle>> genParticlesHandle;
   iEvent.getByToken(genParticles_, genParticlesHandle);
@@ -915,63 +1047,16 @@ void PFAnalysis::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup
       }
     }
 
-    const auto& props = reco::mlpf::getElementProperties(orig, gsfElectrons);
-
-    element_pt_.push_back(props.pt);
-    element_pterror_.push_back(props.pterror);
-    element_px_.push_back(props.px);
-    element_py_.push_back(props.py);
-    element_pz_.push_back(props.pz);
-    element_sigma_x_.push_back(props.sigma_x);
-    element_sigma_y_.push_back(props.sigma_y);
-    element_sigma_z_.push_back(props.sigma_z);
-    element_deltap_.push_back(props.deltap);
-    element_sigmadeltap_.push_back(props.sigmadeltap);
-    element_eta_.push_back(props.eta);
-    element_etaerror_.push_back(props.etaerror);
-    element_phi_.push_back(props.phi);
-    element_phierror_.push_back(props.phierror);
-    element_energy_.push_back(props.energy);
-    element_corr_energy_.push_back(props.corr_energy);
-    element_corr_energy_err_.push_back(props.corr_energy_err);
-    element_eta_ecal_.push_back(props.eta_ecal);
-    element_phi_ecal_.push_back(props.phi_ecal);
-    element_eta_hcal_.push_back(props.eta_hcal);
-    element_phi_hcal_.push_back(props.phi_hcal);
-    element_charge_.push_back(props.charge);
-    element_type_.push_back(props.type);
-    element_layer_.push_back(props.layer);
-    element_depth_.push_back(props.depth);
-    element_trajpoint_.push_back(props.trajpoint);
-    element_muon_dt_hits_.push_back(props.muon_dt_hits);
-    element_muon_csc_hits_.push_back(props.muon_csc_hits);
-    element_muon_type_.push_back(props.muon_type);
-    element_cluster_flags_.push_back(props.cluster_flags);
-    element_gsf_electronseed_trkorecal_.push_back(props.gsf_electronseed_trkorecal);
-    element_gsf_electronseed_dnn1_.push_back(props.gsf_electronseed_dnn1);
-    element_gsf_electronseed_dnn2_.push_back(props.gsf_electronseed_dnn2);
-    element_gsf_electronseed_dnn3_.push_back(props.gsf_electronseed_dnn3);
-    element_gsf_electronseed_dnn4_.push_back(props.gsf_electronseed_dnn4);
-    element_gsf_electronseed_dnn5_.push_back(props.gsf_electronseed_dnn5);
-    element_num_hits_.push_back(props.num_hits);
-    element_lambda_.push_back(props.lambda);
-    element_lambdaerror_.push_back(props.lambdaerror);
-    element_theta_.push_back(props.theta);
-    element_thetaerror_.push_back(props.thetaerror);
-    element_vx_.push_back(props.vx);
-    element_vy_.push_back(props.vy);
-    element_vz_.push_back(props.vz);
-    element_time_.push_back(props.time);
-    element_timeerror_.push_back(props.timeerror);
-    element_etaerror1_.push_back(props.etaerror1);
-    element_etaerror2_.push_back(props.etaerror2);
-    element_etaerror3_.push_back(props.etaerror3);
-    element_etaerror4_.push_back(props.etaerror4);
-    element_phierror1_.push_back(props.phierror1);
-    element_phierror2_.push_back(props.phierror2);
-    element_phierror3_.push_back(props.phierror3);
-    element_phierror4_.push_back(props.phierror4);
+    const auto& props = reco::mlpf::getElementProperties(orig, gsfElectrons, primaryVertices);
+    fillVariables(props);
   }  //all_elements
+
+  for (auto const& vertex : primaryVertices) {
+    if (vertex.isValid() && (!vertex.isFake())) {
+      const auto& props = reco::mlpf::getVertexProperties(vertex);
+      fillVariables(props);
+    }
+  }
 
   //fill caloparticle_to_element
   for (const auto& cp_to_pf : caloparticle_to_pfcluster) {

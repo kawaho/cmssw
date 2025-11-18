@@ -30,12 +30,14 @@ public:
 private:
   const edm::EDPutTokenT<reco::PFCandidateCollection> pfCandidatesPutToken_;
   const edm::EDGetTokenT<edm::View<reco::GsfElectron>> gsfElectrons_;
+  const edm::EDGetTokenT<reco::VertexCollection> vertices_;
   const edm::EDGetTokenT<reco::PFBlockCollection> inputTagBlocks_;
 };
 
 MLPFProducer::MLPFProducer(const edm::ParameterSet& cfg, const ONNXRuntime* cache)
     : pfCandidatesPutToken_{produces<reco::PFCandidateCollection>()},
       gsfElectrons_{consumes<edm::View<reco::GsfElectron>>(edm::InputTag("gedGsfElectronsTmp"))},
+      vertices_{consumes<reco::VertexCollection>(cfg.getParameter<edm::InputTag>("vertexCollection"))},
       inputTagBlocks_{consumes<reco::PFBlockCollection>(cfg.getParameter<edm::InputTag>("src"))} {}
 
 void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
@@ -45,6 +47,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
   const auto& all_elements = getPFElements(blocks);
 
   const auto& gsfElectrons = event.get(gsfElectrons_);
+  const auto& primaryVertices = event.get(vertices_);
 
   std::vector<const reco::PFBlockElement*> selected_elements;
   unsigned int num_elements_total = all_elements.size();
@@ -69,7 +72,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
   //Fill the input tensor (batch, elems, features) = (1, tensor_size, NUM_ELEMENT_FEATURES)
   std::vector<std::vector<float>> inputs;
-  inputs.push_back(std::vector<float>(NUM_ELEMENT_FEATURES * tensor_size, 0.0));
+  inputs.push_back(std::vector<float>((NUM_ELEMENT_FEATURES-NUM_VERTEX_FEATURES) * tensor_size, 0.0));
   inputs.push_back(std::vector<float>(tensor_size, 0.0));
   unsigned int ielem = 0;
   for (const auto* pelem : selected_elements) {
@@ -83,11 +86,11 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
     const auto& elem = *pelem;
 
     //prepare the input array from the PFElement
-    const auto& props = getElementProperties(elem, gsfElectrons).as_array();
+    const auto& props = getElementProperties(elem, gsfElectrons, primaryVertices).as_array();
 
     //copy features to the input array
-    for (unsigned int iprop = 0; iprop < NUM_ELEMENT_FEATURES; iprop++) {
-      const auto vec_elem = ielem * NUM_ELEMENT_FEATURES + iprop;
+    for (unsigned int iprop = 0; iprop < NUM_ELEMENT_FEATURES-NUM_VERTEX_FEATURES; iprop++) {
+      const auto vec_elem = ielem * (NUM_ELEMENT_FEATURES-NUM_VERTEX_FEATURES) + iprop;
       assert(vec_elem < inputs[0].size()); 
       inputs[0][vec_elem] = normalize(props[iprop]);
     }
@@ -104,7 +107,7 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 #endif
 
   //run the GNN inference, given the inputs and the output.
-  const auto& outputs = globalCache()->run({"Xfeat_normed", "mask"}, inputs, {{1, tensor_size, NUM_ELEMENT_FEATURES}, {1, tensor_size}});
+  const auto& outputs = globalCache()->run({"Xfeat_normed", "mask"}, inputs, {{1, tensor_size, NUM_ELEMENT_FEATURES-NUM_VERTEX_FEATURES}, {1, tensor_size}});
   const auto& output_binary = outputs[0];
   const auto& output_pid = outputs[1];
   const auto& output_p4 = outputs[2];
@@ -127,8 +130,8 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
 #ifdef MLPF_DEBUG
     std::cout << "ielem=" << ielem << " inputs:";
-    for (unsigned int iprop = 0; iprop < NUM_ELEMENT_FEATURES; iprop++) {
-      std::cout << iprop << "=" << inputs[0][ielem * NUM_ELEMENT_FEATURES + iprop] << " ";
+    for (unsigned int iprop = 0; iprop < (NUM_ELEMENT_FEATURES-NUM_VERTEX_FEATURES); iprop++) {
+      std::cout << iprop << "=" << inputs[0][ielem * (NUM_ELEMENT_FEATURES-NUM_VERTEX_FEATURES) + iprop] << " ";
     }
     std::cout << std::endl;
 #endif
@@ -210,12 +213,12 @@ void MLPFProducer::produce(edm::Event& event, const edm::EventSetup& setup) {
 
       //get the predicted momentum components from the model
       float pred_pt = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_PT];
-      pred_pt = exp(pred_pt) * inputs[0][ielem * NUM_ELEMENT_FEATURES + 1]; 
+      pred_pt = exp(pred_pt) * inputs[0][ielem * (NUM_ELEMENT_FEATURES-NUM_VERTEX_FEATURES) + 1]; 
       float pred_eta = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_ETA];
       float pred_sin_phi = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_SIN_PHI];
       float pred_cos_phi = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_COS_PHI];
       float pred_e = output_p4[ielem * NUM_OUTPUT_FEATURES_P4 + IDX_ENERGY];
-      pred_e = exp(pred_e) * inputs[0][ielem * NUM_ELEMENT_FEATURES + 5];
+      pred_e = exp(pred_e) * inputs[0][ielem * (NUM_ELEMENT_FEATURES -NUM_VERTEX_FEATURES) + 5];
      
       if (elem->type() == reco::PFBlockElement::TRACK) {
           const auto* eltTrack = dynamic_cast<const reco::PFBlockElementTrack*>(elem);
@@ -250,6 +253,7 @@ void MLPFProducer::globalEndJob(const ONNXRuntime* cache) {}
 void MLPFProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.add<edm::InputTag>("src", edm::InputTag("particleFlowBlock"));
+  desc.add<edm::InputTag>("vertexCollection", edm::InputTag("offlinePrimaryVertices"));
   desc.add<edm::FileInPath>("model_path",
                             edm::FileInPath("RecoParticleFlow/PFProducer/data/mlpf/"
                                             "mlpf_5M_attn2x3x256_bm12_relu_checkpoint10_8xmi250_fp32_fused_20250722.onnx"));

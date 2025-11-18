@@ -8,63 +8,81 @@
 namespace reco::mlpf {
 
   //The model takes the following number of features for each input PFElement
-  static constexpr unsigned int NUM_ELEMENT_FEATURES = 55;
+  static constexpr unsigned int NUM_ELEMENT_FEATURES = 72;
+  static constexpr unsigned int NUM_VERTEX_FEATURES = 17;
 
   struct ElementFeatures {
-    float type;
-    float pt;
-    float eta;
-    float phi;
-    float energy;
-    float layer;
-    float depth;
-    float charge;
-    float trajpoint;
-    float eta_ecal;
-    float phi_ecal;
-    float eta_hcal;
-    float phi_hcal;
-    float muon_dt_hits;
-    float muon_csc_hits;
-    float muon_type;
-    float px;
-    float py;
-    float pz;
-    float sigma_x;
-    float sigma_y;
-    float sigma_z;
-    float deltap;
-    float sigmadeltap;
-    float gsf_electronseed_trkorecal;
-    float gsf_electronseed_dnn1;
-    float gsf_electronseed_dnn2;
-    float gsf_electronseed_dnn3;
-    float gsf_electronseed_dnn4;
-    float gsf_electronseed_dnn5;
-    float num_hits;
-    float cluster_flags;
-    float corr_energy;
-    float corr_energy_err;
-    float vx;
-    float vy;
-    float vz;
-    float pterror;
-    float etaerror;
-    float phierror;
-    float lambda;
-    float lambdaerror;
-    float theta;
-    float thetaerror;
-    float time;
-    float timeerror;
-    float etaerror1;
-    float phierror1;
-    float etaerror2;
-    float phierror2;
-    float etaerror3;
-    float phierror3;
-    float etaerror4;
-    float phierror4;
+    float type = 0.0;
+    float pt = 0.0;
+    float eta = 0.0;
+    float phi = 0.0;
+    float energy = 0.0;
+    float layer = 0.0;
+    float depth = 0.0;
+    float charge = 0.0;
+    float trajpoint = 0.0;
+    float eta_ecal = 0.0;
+    float phi_ecal = 0.0;
+    float eta_hcal = 0.0;
+    float phi_hcal = 0.0;
+    float muon_dt_hits = 0.0;
+    float muon_csc_hits = 0.0;
+    float muon_type = 0.0;
+    float px = 0.0;
+    float py = 0.0;
+    float pz = 0.0;
+    float sigma_x = 0.0;
+    float sigma_y = 0.0;
+    float sigma_z = 0.0;
+    float deltap = 0.0;
+    float sigmadeltap = 0.0;
+    float gsf_electronseed_trkorecal = 0.0;
+    float gsf_electronseed_dnn1 = 0.0;
+    float gsf_electronseed_dnn2 = 0.0;
+    float gsf_electronseed_dnn3 = 0.0;
+    float gsf_electronseed_dnn4 = 0.0;
+    float gsf_electronseed_dnn5 = 0.0;
+    float num_hits = 0.0;
+    float cluster_flags = 0.0;
+    float corr_energy = 0.0;
+    float corr_energy_err = 0.0;
+    float pca_x = 0.0;
+    float pca_y = 0.0;
+    float pca_z = 0.0;
+    float pterror = 0.0;
+    float etaerror = 0.0;
+    float phierror = 0.0;
+    float lambda = 0.0;
+    float lambdaerror = 0.0;
+    float theta = 0.0;
+    float thetaerror = 0.0;
+    float time = 0.0;
+    float timeerror = 0.0;
+    float etaerror1 = 0.0;
+    float phierror1 = 0.0;
+    float etaerror2 = 0.0;
+    float phierror2 = 0.0;
+    float etaerror3 = 0.0;
+    float phierror3 = 0.0;
+    float etaerror4 = 0.0;
+    float phierror4 = 0.0;
+    float vtx_x = 0.0;
+    float vtx_y = 0.0;
+    float vtx_z = 0.0;
+    float ntracks = 0.0;
+    float v_normalized_chi2 = 0.0;
+    float vx = 0.0;
+    float vy = 0.0;
+    float vz = 0.0;
+    float vt = 0.0;
+    float vx_err = 0.0;
+    float vy_err = 0.0;
+    float vz_err = 0.0;
+    float vt_err = 0.0;
+    float vpx = 0.0;
+    float vpy = 0.0;
+    float vpz = 0.0;
+    float ve = 0.0;
 
     // MLPF features in 2024
     // from particleflow/mlpf/heptfds/cms_pf/utils.py
@@ -101,9 +119,9 @@ namespace reco::mlpf {
                cluster_flags,
                corr_energy,
                corr_energy_err,
-               vx,
-               vy,
-               vz,
+               pca_x,
+               pca_y,
+               pca_z,
                pterror,
                etaerror,
                phierror,
@@ -124,6 +142,23 @@ namespace reco::mlpf {
 	       sigma_x,
 	       sigma_y,
 	       sigma_z,
+               vtx_x,
+               vtx_y,
+               vtx_z,
+               ntracks,
+               v_normalized_chi2,
+               vx,
+               vy,
+               vz,
+               vt,
+               vx_err,
+               vy_err,
+               vz_err,
+               vt_err,
+               vpx,
+               vpy,
+               vpz,
+               ve, 
         }};
     }
   };
@@ -168,7 +203,11 @@ namespace reco::mlpf {
   };
 
   ElementFeatures getElementProperties(const reco::PFBlockElement& orig,
-                                       const edm::View<reco::GsfElectron>& gsfElectrons);
+                                       const edm::View<reco::GsfElectron>& gsfElectrons,
+                                       const reco::VertexCollection& primaryVertices);
+
+  ElementFeatures getVertexProperties(const reco::Vertex& primaryVertex);
+
   float normalize(float in);
 
   int argMax(std::vector<float> const& vec);

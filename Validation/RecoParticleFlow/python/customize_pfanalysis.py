@@ -61,6 +61,7 @@ def customize_step3(process):
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoTracks_*_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoGsfTracks_*_*_*')
     process.FEVTDEBUGHLToutput.outputCommands.append('keep recoPFBlocks_*_*_*')
+    process.FEVTDEBUGHLToutput.outputCommands.append('keep  *_offlinePrimaryVertices__*')
     #process.FEVTDEBUGHLToutput.outputCommands.append("keep *_*G4*_*_*")
     #process.FEVTDEBUGHLToutput.outputCommands.append("keep SimClustersedmAssociation_mix_*_*")
     #process.FEVTDEBUGHLToutput.outputCommands.append("keep CaloParticlesedmAssociation_mix_*_*")

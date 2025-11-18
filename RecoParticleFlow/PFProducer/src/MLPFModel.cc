@@ -13,10 +13,34 @@
 #include "TMath.h"
 
 namespace reco::mlpf {
+  //Prepares the input array of floats for a single vertex
+  ElementFeatures getVertexProperties(const reco::Vertex& primaryVertex) {
+
+    ElementFeatures ret;
+    ret.type = 14; //PFElement type goes up to 13, use 14 for vertex
+
+    ret.ntracks = primaryVertex.nTracks();
+    ret.v_normalized_chi2 = primaryVertex.normalizedChi2();
+    ret.vx = primaryVertex.x();
+    ret.vy = primaryVertex.y();
+    ret.vz = primaryVertex.z();
+    ret.vt = primaryVertex.t();
+    ret.vx_err = primaryVertex.xError();
+    ret.vy_err = primaryVertex.yError();
+    ret.vz_err = primaryVertex.zError();
+    ret.vt_err = primaryVertex.tError();
+    ret.vpx = primaryVertex.p4().px();
+    ret.vpy = primaryVertex.p4().py();
+    ret.vpz = primaryVertex.p4().pz();
+    ret.ve = primaryVertex.p4().e();
+
+    return ret;
+  }
 
   //Prepares the input array of floats for a single PFElement
   ElementFeatures getElementProperties(const reco::PFBlockElement& orig,
-                                       const edm::View<reco::GsfElectron>& gsfElectrons) {
+                                       const edm::View<reco::GsfElectron>& gsfElectrons,
+                                       const reco::VertexCollection& primaryVertices) {
     const auto type = orig.type();
 
     float pt = 0.0;
@@ -38,9 +62,9 @@ namespace reco::mlpf {
     float theta = 0.0;
     float thetaerror = 0.0;
     float energy = 0.0;
-    float vx = 0.0;
-    float vy = 0.0;
-    float vz = 0.0;
+    float pca_x = 0.0;
+    float pca_y = 0.0;
+    float pca_z = 0.0;
     float corr_energy = 0.0;
     float corr_energy_err = 0.0;
     float trajpoint = 0.0;
@@ -72,6 +96,9 @@ namespace reco::mlpf {
     float phierror3 = 0.0;
     float etaerror4 = 0.0;
     float phierror4 = 0.0;
+    float vtx_x = 0.0;
+    float vtx_y = 0.0;
+    float vtx_z = 0.0;
 
     if (type == reco::PFBlockElement::TRACK) {
       const auto& matched_pftrack = orig.trackRefPF();
@@ -88,6 +115,21 @@ namespace reco::mlpf {
         }
       }
       const auto& ref = ((const reco::PFBlockElementTrack*)&orig)->trackRef();
+      
+      reco::TrackBaseRef tbref(ref);
+      float maxTackWeight = -1;
+      for (auto const& vertex : primaryVertices) {
+        if (vertex.isValid() && (!vertex.isFake())) {
+          auto tmpTrackWeight = vertex.trackWeight(tbref);
+          if (tmpTrackWeight > maxTackWeight) {
+            maxTackWeight = tmpTrackWeight;
+            vtx_x = vertex.x();
+            vtx_y = vertex.y();
+            vtx_z = vertex.z();
+          }
+        }
+      }
+
       pt = ref->pt();
       pterror = ref->ptError();
       px = ref->px();
@@ -104,9 +146,9 @@ namespace reco::mlpf {
       lambdaerror = ref->lambdaError();
       theta = ref->theta();
       thetaerror = ref->thetaError();
-      vx = ref->vx();
-      vy = ref->vy();
-      vz = ref->vz();
+      pca_x = ref->vx();
+      pca_y = ref->vy();
+      pca_z = ref->vz();
 
       reco::MuonRef muonRef = orig.muonRef();
       if (muonRef.isNonnull()) {
@@ -180,9 +222,23 @@ namespace reco::mlpf {
       lambdaerror = ref->lambdaModeError();
       theta = ref->thetaMode();
       thetaerror = ref->thetaModeError();
-      vx = ref->vx();
-      vy = ref->vy();
-      vz = ref->vz();
+      pca_x = ref->vx();
+      pca_y = ref->vy();
+      pca_z = ref->vz();
+
+      reco::TrackBaseRef tbref(ref);
+      float maxTackWeight = -1;
+      for (auto const& vertex : primaryVertices) {
+        if (vertex.isValid() && (!vertex.isFake())) {
+          auto tmpTrackWeight = vertex.trackWeight(tbref);
+          if (tmpTrackWeight > maxTackWeight) {
+            maxTackWeight = tmpTrackWeight;
+            vtx_x = vertex.x();
+            vtx_y = vertex.y();
+            vtx_z = vertex.z();
+          }
+        }
+      }
 
       //Find the GSF electron that corresponds to this GSF track
       for (const auto& gsfEle : gsfElectrons) {
@@ -227,9 +283,9 @@ namespace reco::mlpf {
         layer = ref->layer();
         depth = ref->depth();
         num_hits = ref->recHitFractions().size();
-        vx = ref->vx();
-        vy = ref->vy();
-        vz = ref->vz();
+        pca_x = ref->vx();
+        pca_y = ref->vy();
+        pca_z = ref->vz();
 
         time = ref->time();
         timeerror = ref->timeError();
@@ -379,9 +435,9 @@ namespace reco::mlpf {
     ret.cluster_flags = cluster_flags;
     ret.corr_energy = corr_energy;
     ret.corr_energy_err = corr_energy_err;
-    ret.vx = vx;
-    ret.vy = vy;
-    ret.vz = vz;
+    ret.pca_x = pca_x;
+    ret.pca_y = pca_y;
+    ret.pca_z = pca_z;
     ret.pterror = pterror;
     ret.etaerror = etaerror;
     ret.phierror = phierror;
@@ -399,6 +455,9 @@ namespace reco::mlpf {
     ret.phierror3 = phierror3;
     ret.etaerror4 = etaerror4;
     ret.phierror4 = phierror4;
+    ret.vtx_x = vtx_x;
+    ret.vtx_y = vtx_y;
+    ret.vtx_z = vtx_z;
 
     return ret;
   }
