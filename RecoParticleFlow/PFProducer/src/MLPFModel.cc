@@ -99,6 +99,7 @@ namespace reco::mlpf {
     float vtx_x = 0.0;
     float vtx_y = 0.0;
     float vtx_z = 0.0;
+    float vtx_t = 0.0;
 
     if (type == reco::PFBlockElement::TRACK) {
       const auto& matched_pftrack = orig.trackRefPF();
@@ -126,6 +127,7 @@ namespace reco::mlpf {
             vtx_x = vertex.x();
             vtx_y = vertex.y();
             vtx_z = vertex.z();
+            vtx_t = vertex.t();
           }
         }
       }
@@ -236,6 +238,7 @@ namespace reco::mlpf {
             vtx_x = vertex.x();
             vtx_y = vertex.y();
             vtx_z = vertex.z();
+            vtx_t = vertex.t();
           }
         }
       }
@@ -458,6 +461,7 @@ namespace reco::mlpf {
     ret.vtx_x = vtx_x;
     ret.vtx_y = vtx_y;
     ret.vtx_z = vtx_z;
+    ret.vtx_t = vtx_t;
 
     return ret;
   }

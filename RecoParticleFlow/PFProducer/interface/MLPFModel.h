@@ -8,8 +8,8 @@
 namespace reco::mlpf {
 
   //The model takes the following number of features for each input PFElement
-  static constexpr unsigned int NUM_ELEMENT_FEATURES = 72;
-  static constexpr unsigned int NUM_VERTEX_FEATURES = 17;
+  static constexpr unsigned int NUM_ELEMENT_FEATURES = 73;
+  static constexpr unsigned int NUM_VERTEX_FEATURES = 18;
 
   struct ElementFeatures {
     float type = 0.0;
@@ -69,6 +69,7 @@ namespace reco::mlpf {
     float vtx_x = 0.0;
     float vtx_y = 0.0;
     float vtx_z = 0.0;
+    float vtx_t = 0.0;
     float ntracks = 0.0;
     float v_normalized_chi2 = 0.0;
     float vx = 0.0;
@@ -145,6 +146,7 @@ namespace reco::mlpf {
                vtx_x,
                vtx_y,
                vtx_z,
+               vtx_t,
                ntracks,
                v_normalized_chi2,
                vx,

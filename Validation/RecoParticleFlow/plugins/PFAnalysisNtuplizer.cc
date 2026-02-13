@@ -277,6 +277,7 @@ private:
   vector<float> element_vtx_x_;
   vector<float> element_vtx_y_;
   vector<float> element_vtx_z_;
+  vector<float> element_vtx_t_;
   vector<float> element_ntracks_;
   vector<float> element_v_normalized_chi2_;
   vector<float> element_vx_;
@@ -460,6 +461,7 @@ PFAnalysis::PFAnalysis(const edm::ParameterSet& iConfig) {
   t_->Branch("element_vtx_x", &element_vtx_x_);
   t_->Branch("element_vtx_y", &element_vtx_y_);
   t_->Branch("element_vtx_z", &element_vtx_z_);
+  t_->Branch("element_vtx_t", &element_vtx_t_);
   t_->Branch("element_ntracks", &element_ntracks_);
   t_->Branch("element_v_normalized_chi2", &element_v_normalized_chi2_);
   t_->Branch("element_vx", &element_vx_);
@@ -636,6 +638,7 @@ void PFAnalysis::clearVariables() {
   element_vtx_x_.clear();
   element_vtx_y_.clear();
   element_vtx_z_.clear();
+  element_vtx_t_.clear();
   element_ntracks_.clear();
   element_v_normalized_chi2_.clear();
   element_vx_.clear();
@@ -724,6 +727,7 @@ void PFAnalysis::fillVariables(const reco::mlpf::ElementFeatures& props) {
   element_vtx_x_.push_back(props.vtx_x);
   element_vtx_y_.push_back(props.vtx_y);
   element_vtx_z_.push_back(props.vtx_z);
+  element_vtx_t_.push_back(props.vtx_t);
   element_ntracks_.push_back(props.ntracks);
   element_v_normalized_chi2_.push_back(props.v_normalized_chi2);
   element_vx_.push_back(props.vx);
