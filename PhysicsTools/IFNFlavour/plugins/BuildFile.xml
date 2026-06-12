@@ -1,0 +1,23 @@
+<!--
+  IFN flavour EDProducer plugins. These talk to the vendored fastjet 3.4.1 + IFN
+  code ONLY through the fastjet-free ifnflavour:: wrapper in PhysicsTools/IFNFlavour,
+  so we must NOT <use name="fastjet"/> here (that would re-expose the cvmfs 3.3.0
+  headers/symbols). The wrapper library carries the (hidden) fastjet 3.4.1 internally.
+-->
+<use name="PhysicsTools/IFNFlavour"/>
+<use name="FWCore/Framework"/>
+<use name="FWCore/PluginManager"/>
+<use name="FWCore/ParameterSet"/>
+<use name="FWCore/Utilities"/>
+<use name="DataFormats/JetReco"/>
+<use name="DataFormats/Candidate"/>
+<use name="DataFormats/HepMCCandidate"/>
+<use name="DataFormats/Math"/>
+<use name="PhysicsTools/JetMCUtils"/>
+<use name="DataFormats/NanoAOD"/>
+<use name="SimDataFormats/JetMatching"/>
+<use name="CommonTools/Utils"/>
+
+<library file="*.cc" name="PhysicsToolsIFNFlavourPlugins">
+  <flags EDM_PLUGIN="1"/>
+</library>

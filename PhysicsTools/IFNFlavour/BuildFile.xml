@@ -1,0 +1,28 @@
+<!--
+  PhysicsTools/IFNFlavour : vendored fastjet 3.4.1 core + IFNPlugin (fjcontrib 1.0.4).
+  IFN requires fastjet >= 3.4.1, but this release ships fastjet 3.3.0 on cvmfs, so we
+  compile a private copy here.
+
+  Layout:
+    fastjet341/include/   -> vendored fastjet 3.4.1 + IFN headers (reached via local -I)
+    src/vendor/*.cc       -> vendored fastjet 3.4.1 core + IFN sources
+    src/IFNFlavourCalculator.cc -> fastjet-free wrapper (the only exported API)
+
+  Isolation: we deliberately do NOT <use name="fastjet"/> (that would put the cvmfs
+  3.3.0 headers on the include path and clash). The vendored headers are reached via a
+  local -I onto fastjet341/include. All fastjet/IFN symbols are compiled with
+  -fvisibility=hidden so they stay internal to this library and cannot collide with the
+  cvmfs fastjet 3.3.0 symbols also present in the same cmsRun process. Only the
+  ifnflavour:: wrapper API (marked IFNFLAVOUR_API = default visibility) is exported.
+
+  ADD_SUBDIR=1 makes scram recurse into src/vendor/ to compile the vendored sources.
+-->
+<flags ADD_SUBDIR="1"/>
+<!-- DROP_CGAL: this vendored fastjet was configured without CGAL support, matching the
+     standalone build (-DDROP_CGAL guards the CGAL-only Delaunay triangulation code). -->
+<flags CXXFLAGS="-I$(LOCALTOP)/src/PhysicsTools/IFNFlavour/fastjet341/include -DDROP_CGAL -fvisibility=hidden -fvisibility-inlines-hidden -w"/>
+<flags REM_CXXFLAGS="-Werror=unused-variable -Werror=unused-but-set-variable -Werror=reorder"/>
+
+<export>
+  <lib name="PhysicsToolsIFNFlavour"/>
+</export>
