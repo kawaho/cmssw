@@ -22,6 +22,7 @@ def addIFNFlavourValidation(process,
                             ifnFlavourInfos=None,
                             ifnJets=None,
                             ifnJetNetFlavour=None,
+                            strict=False,
                             ptMin=10.0):
     """Wire up the IFNFlavourValidator EDAnalyzer + TFileService.
 
@@ -47,17 +48,21 @@ def addIFNFlavourValidation(process,
     if ifnJetNetFlavour is None:
         ifnJetNetFlavour = cms.InputTag("genJetFlavourAssociationIFN", "ifnJetNetFlavour")
 
+    genEvent = cms.InputTag("generator")
+
     process.TFileService = cms.Service("TFileService",
         fileName = cms.string(outputFile),
         closeFileFast = cms.untracked.bool(True),
     )
 
     process.ifnFlavourValidator = cms.EDAnalyzer("IFNFlavourValidator",
+	generator = genEvent,
         genJets = genJets,
         ghostFlavourInfos = ghostFlavourInfos,
         ifnFlavourInfos = ifnFlavourInfos,
         ifnJets = ifnJets,
         ifnJetNetFlavour = ifnJetNetFlavour,
+        strict = cms.bool(False),
         ptMin = cms.double(ptMin),
     )
 

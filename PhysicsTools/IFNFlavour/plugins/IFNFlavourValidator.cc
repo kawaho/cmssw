@@ -21,6 +21,11 @@
 //   ifnJetNetFlavour      -- flat std::vector<int> published as
 //                            <module>:ifnJetNetFlavour; jet j's netFlavour[k]
 //                            is at index 7*j + k. Parallel to ifnJets.
+//   genJetIFNIndex        -- std::vector<int> published as
+//                            <module>:genJetIFNIndex; parallel to genJets, gives
+//                            the matched IFN jet index (-1 if no match). The
+//                            matching is done in the producer; the validator
+//                            just forwards it as a TTree branch.
 //
 // Output (via TFileService):
 //   per-IFN-category TH2D composition_(parton|hadron)Flavour_vs_pt_IFN_<X>
@@ -72,6 +77,10 @@
 #include "SimDataFormats/JetMatching/interface/JetFlavourInfo.h"
 #include "SimDataFormats/JetMatching/interface/JetFlavourInfoMatching.h"
 
+#include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
+
+#include "PhysicsTools/IFNFlavour/interface/IFNFlavourCalculator.h"
+
 #include "TH2D.h"
 #include "TTree.h"
 
@@ -92,12 +101,15 @@ private:
   // Coarse bucket key for hist names. Same scheme used for IFN and ghost.
   static std::string flavourBucket(int signedFlavour);
 
+  const edm::EDGetTokenT<GenEventInfoProduct> genTag_;
   const edm::EDGetTokenT<edm::View<reco::Jet> > jetsToken_;
   const edm::EDGetTokenT<reco::JetFlavourInfoMatchingCollection> ghostInfosToken_;
   const edm::EDGetTokenT<reco::JetFlavourInfoMatchingCollection> ifnInfosToken_;
   const edm::EDGetTokenT<reco::BasicJetCollection> ifnJetsToken_;
   const edm::EDGetTokenT<std::vector<int> > ifnNetFlavourToken_;
+  const edm::EDGetTokenT<std::vector<int> > genJetIFNIndexToken_;
 
+  const bool strict_;
   const double ptMin_;   // minimum pt for TTree/etaphi entries (composition uses all)
 
   // Per-bucket histograms, lazily booked on first sight of a bucket key.
@@ -112,15 +124,18 @@ private:
   // Per-event scratch buffers for the TTree. Cleared at the start of analyze().
   unsigned int b_run_ = 0, b_lumi_ = 0;
   unsigned long long b_event_ = 0;
+  double weight;
   std::vector<float> b_genJet_pt_, b_genJet_eta_, b_genJet_phi_;
   std::vector<int> b_genJet_partonFlavour_, b_genJet_hadronFlavour_, b_genJet_partonFlavourIFN_;
+  std::vector<int> b_genJet_ifnJetIdx_;  // matched IFN jet index per gen jet, -1 if no match
   std::vector<float> b_ifnJet_pt_, b_ifnJet_eta_, b_ifnJet_phi_;
   std::vector<int> b_ifnJet_partonFlavour_;
   std::vector<int> b_ifnJet_netFlavour_;  // flat, length 7 * IFNJet_pt.size()
 };
 
 IFNFlavourValidator::IFNFlavourValidator(const edm::ParameterSet& iConfig)
-    : jetsToken_(consumes<edm::View<reco::Jet> >(iConfig.getParameter<edm::InputTag>("genJets"))),
+    : genTag_(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("generator"))),
+      jetsToken_(consumes<edm::View<reco::Jet> >(iConfig.getParameter<edm::InputTag>("genJets"))),
       ghostInfosToken_(
           consumes<reco::JetFlavourInfoMatchingCollection>(iConfig.getParameter<edm::InputTag>("ghostFlavourInfos"))),
       ifnInfosToken_(
@@ -128,6 +143,9 @@ IFNFlavourValidator::IFNFlavourValidator(const edm::ParameterSet& iConfig)
       ifnJetsToken_(consumes<reco::BasicJetCollection>(iConfig.getParameter<edm::InputTag>("ifnJets"))),
       ifnNetFlavourToken_(
           consumes<std::vector<int> >(iConfig.getParameter<edm::InputTag>("ifnJetNetFlavour"))),
+      genJetIFNIndexToken_(
+          consumes<std::vector<int> >(iConfig.getParameter<edm::InputTag>("genJetIFNIndex"))),
+      strict_(iConfig.getParameter<bool>("strict")),
       ptMin_(iConfig.getParameter<double>("ptMin")) {
   usesResource("TFileService");
 
@@ -135,6 +153,7 @@ IFNFlavourValidator::IFNFlavourValidator(const edm::ParameterSet& iConfig)
   tree_ = fs->make<TTree>("jets", "GenJet + IFN jet info for IFN-flavour validation");
   tree_->Branch("run", &b_run_, "run/i");
   tree_->Branch("lumi", &b_lumi_, "lumi/i");
+  tree_->Branch("weight", &weight);
   tree_->Branch("event", &b_event_, "event/l");
   tree_->Branch("GenJet_pt", &b_genJet_pt_);
   tree_->Branch("GenJet_eta", &b_genJet_eta_);
@@ -142,29 +161,13 @@ IFNFlavourValidator::IFNFlavourValidator(const edm::ParameterSet& iConfig)
   tree_->Branch("GenJet_partonFlavour", &b_genJet_partonFlavour_);
   tree_->Branch("GenJet_hadronFlavour", &b_genJet_hadronFlavour_);
   tree_->Branch("GenJet_partonFlavourIFN", &b_genJet_partonFlavourIFN_);
+  tree_->Branch("GenJet_ifnJetIdx", &b_genJet_ifnJetIdx_);
   tree_->Branch("IFNJet_pt", &b_ifnJet_pt_);
   tree_->Branch("IFNJet_eta", &b_ifnJet_eta_);
   tree_->Branch("IFNJet_phi", &b_ifnJet_phi_);
   tree_->Branch("IFNJet_partonFlavour", &b_ifnJet_partonFlavour_);
   // Flat vector of length 7 * IFNJet_pt.size(): jet j's netFlavour[k] is at 7*j+k.
   tree_->Branch("IFNJet_netFlavour", &b_ifnJet_netFlavour_);
-}
-
-int IFNFlavourValidator::partonFlavourFromNet(const int netFlavour[7]) {
-  int found = 0;
-  int flavour = 0;
-  for (int f = 0; f <= 6; ++f) {
-    if (netFlavour[f] != 0) {
-      ++found;
-      if (f == 0)
-        flavour = 21;
-      else
-        flavour = (netFlavour[f] > 0 ? f : -f);
-    }
-  }
-  if (found > 1)
-    return -2;
-  return flavour;
 }
 
 std::string IFNFlavourValidator::flavourBucket(int signedFlavour) {
@@ -204,10 +207,18 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
   edm::Handle<std::vector<int> > ifnNet;
   iEvent.getByToken(ifnNetFlavourToken_, ifnNet);
 
+  edm::Handle<std::vector<int> > genJetIFNIdx;
+  iEvent.getByToken(genJetIFNIndexToken_, genJetIFNIdx);
+
   if (ifnNet->size() != 7 * ifnJets->size())
     throw cms::Exception("IFNFlavourValidator")
         << "ifnJetNetFlavour size (" << ifnNet->size() << ") != 7 * ifnJets size ("
         << ifnJets->size() << ")";
+
+  if (genJetIFNIdx->size() != genJets->size())
+    throw cms::Exception("IFNFlavourValidator")
+        << "genJetIFNIndex size (" << genJetIFNIdx->size() << ") != genJets size ("
+        << genJets->size() << ")";
 
   // helper: book histograms on first use of a bucket.
   edm::Service<TFileService> fs;
@@ -248,12 +259,18 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
   b_run_ = iEvent.id().run();
   b_lumi_ = iEvent.id().luminosityBlock();
   b_event_ = iEvent.id().event();
+
+  edm::Handle<GenEventInfoProduct> genInfo;
+  iEvent.getByToken(genTag_, genInfo);
+  weight = genInfo->weight();
+
   b_genJet_pt_.clear();
   b_genJet_eta_.clear();
   b_genJet_phi_.clear();
   b_genJet_partonFlavour_.clear();
   b_genJet_hadronFlavour_.clear();
   b_genJet_partonFlavourIFN_.clear();
+  b_genJet_ifnJetIdx_.clear();
   b_ifnJet_pt_.clear();
   b_ifnJet_eta_.clear();
   b_ifnJet_phi_.clear();
@@ -322,6 +339,7 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
     b_genJet_partonFlavour_.push_back(ghostParton);
     b_genJet_hadronFlavour_.push_back(ghostHadron);
     b_genJet_partonFlavourIFN_.push_back(ifnParton);
+    b_genJet_ifnJetIdx_.push_back((*genJetIFNIdx)[i]);
   }
 
   // (3) Per IFN-jet loop: eta-phi event display + TTree. The IFN jets and
@@ -334,7 +352,7 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
     int net[7];
     for (int k = 0; k < 7; ++k)
       net[k] = (*ifnNet)[7 * i + k];
-    const int reduced = partonFlavourFromNet(net);
+    const int reduced = ifnflavour::partonFlavourFromNet(net, strict_);
 
     if (pt > ptMin_) {
       TH2D* he = getOrBook(hEtaPhiIFN_,
@@ -360,6 +378,7 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
 
 void IFNFlavourValidator::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
+  desc.add<edm::InputTag>("generator", edm::InputTag("generator"));
   desc.add<edm::InputTag>("genJets", edm::InputTag("slimmedGenJets"));
   desc.add<edm::InputTag>("ghostFlavourInfos", edm::InputTag("genJetFlavourAssociation"));
   desc.add<edm::InputTag>("ifnFlavourInfos", edm::InputTag("genJetFlavourAssociationIFN"));
@@ -367,7 +386,10 @@ void IFNFlavourValidator::fillDescriptions(edm::ConfigurationDescriptions& descr
       ->setComment("BasicJetCollection published by JetFlavourClusteringIFN");
   desc.add<edm::InputTag>("ifnJetNetFlavour", edm::InputTag("genJetFlavourAssociationIFN", "ifnJetNetFlavour"))
       ->setComment("flat vector<int> of length 7 * nIFNJets, parallel to ifnJets");
+  desc.add<edm::InputTag>("genJetIFNIndex", edm::InputTag("genJetFlavourAssociationIFN", "genJetIFNIndex"))
+      ->setComment("vector<int> parallel to genJets: index of the matched IFN jet, or -1 if no match");
   desc.add<double>("ptMin", 10.0)->setComment("min pt for eta-phi map and TTree entries");
+  desc.add<bool>("strict", false);
   descriptions.addDefault(desc);
 }
 
