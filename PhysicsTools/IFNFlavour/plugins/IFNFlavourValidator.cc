@@ -71,8 +71,11 @@
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
 #include "DataFormats/JetReco/interface/Jet.h"
+#include "DataFormats/JetReco/interface/GenJet.h"
 #include "DataFormats/JetReco/interface/BasicJet.h"
 #include "DataFormats/JetReco/interface/BasicJetCollection.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 #include "DataFormats/Math/interface/deltaR.h"
 #include "SimDataFormats/JetMatching/interface/JetFlavourInfo.h"
 #include "SimDataFormats/JetMatching/interface/JetFlavourInfoMatching.h"
@@ -100,17 +103,29 @@ private:
 
   // Coarse bucket key for hist names. Same scheme used for IFN and ghost.
   static std::string flavourBucket(int signedFlavour);
+  static float hasBHadronAncestor(const reco::Candidate& p,
+                        const reco::GenParticle& bHadron);
+  // Returns true if the particle itself or any ancestor is a b-hadron
+  // (identified via the PDG hundreds / thousands digit equalling 5).
+  static bool isBAncestor(const reco::Candidate& particle);
 
   const edm::EDGetTokenT<GenEventInfoProduct> genTag_;
-  const edm::EDGetTokenT<edm::View<reco::Jet> > jetsToken_;
+  const edm::EDGetTokenT<edm::View<reco::GenJet> > jetsToken_;
   const edm::EDGetTokenT<reco::JetFlavourInfoMatchingCollection> ghostInfosToken_;
   const edm::EDGetTokenT<reco::JetFlavourInfoMatchingCollection> ifnInfosToken_;
   const edm::EDGetTokenT<reco::BasicJetCollection> ifnJetsToken_;
+  const edm::EDGetTokenT<std::vector<double>> ifnJetsConstToken_;
+  const edm::EDGetTokenT<std::vector<double>> ifnJetsConstToken2_;
+  const edm::EDGetTokenT<std::vector<double>> ifnJetsConstToken3_;
+  const edm::EDGetTokenT<std::vector<double>> ifnJetsConstToken4_;
+  const edm::EDGetTokenT<std::vector<int>> nifnJetsConstToken_;
   const edm::EDGetTokenT<std::vector<int> > ifnNetFlavourToken_;
   const edm::EDGetTokenT<std::vector<int> > genJetIFNIndexToken_;
+  const edm::EDGetTokenT<reco::GenParticleRefVector> bHadronsToken_;
 
   const bool strict_;
   const double ptMin_;   // minimum pt for TTree/etaphi entries (composition uses all)
+  const double jetR_;    // jet cone size used for bHadron <-> jet dR matching
 
   // Per-bucket histograms, lazily booked on first sight of a bucket key.
   // composition_(p|h)Flavour_vs_pt_IFN_<bucket>: x = pt, y = ghost flavour code
@@ -131,22 +146,47 @@ private:
   std::vector<float> b_ifnJet_pt_, b_ifnJet_eta_, b_ifnJet_phi_;
   std::vector<int> b_ifnJet_partonFlavour_;
   std::vector<int> b_ifnJet_netFlavour_;  // flat, length 7 * IFNJet_pt.size()
+
+  // bHadron collection (per-event) and matched-bHadron indices per jet.
+  std::vector<float> b_bHadron_e_, b_bHadron_pt_, b_bHadron_eta_, b_bHadron_phi_;
+  std::vector<int> b_bHadron_pdgId_;
+  std::vector<std::vector<int>> b_genJet_bHadronIdx_;
+  std::vector<std::vector<float>> b_genJet_bHadron_e_;
+  std::vector<std::vector<int>> b_ifnJet_bHadronIdx_;
+
+  // Charged daughters of GenJets: one entry per charged daughter (all)
+  std::vector<std::vector<float>> b_genJet_chDaughter_pt_;
+  std::vector<std::vector<float>> b_genJet_chDaughter_eta_;
+  std::vector<std::vector<float>> b_genJet_chDaughter_phi_;
+  std::vector<std::vector<float>> b_genJet_chDaughter_mass_;
+  // All daughters of IFN jets (one entry per daughter)
+  std::vector<std::vector<float>> b_ifnJet_daughter_pt_;
+  std::vector<std::vector<float>> b_ifnJet_daughter_eta_;
+  std::vector<std::vector<float>> b_ifnJet_daughter_phi_;
+  std::vector<std::vector<float>> b_ifnJet_daughter_mass_;
 };
 
 IFNFlavourValidator::IFNFlavourValidator(const edm::ParameterSet& iConfig)
     : genTag_(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("generator"))),
-      jetsToken_(consumes<edm::View<reco::Jet> >(iConfig.getParameter<edm::InputTag>("genJets"))),
+      jetsToken_(consumes<edm::View<reco::GenJet> >(iConfig.getParameter<edm::InputTag>("genJets"))),
       ghostInfosToken_(
           consumes<reco::JetFlavourInfoMatchingCollection>(iConfig.getParameter<edm::InputTag>("ghostFlavourInfos"))),
       ifnInfosToken_(
           consumes<reco::JetFlavourInfoMatchingCollection>(iConfig.getParameter<edm::InputTag>("ifnFlavourInfos"))),
       ifnJetsToken_(consumes<reco::BasicJetCollection>(iConfig.getParameter<edm::InputTag>("ifnJets"))),
+      ifnJetsConstToken_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("ifnJetsConst"))),
+      ifnJetsConstToken2_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("ifnJetsConst2"))),
+      ifnJetsConstToken3_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("ifnJetsConst3"))),
+      ifnJetsConstToken4_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("ifnJetsConst4"))),
+      nifnJetsConstToken_(consumes<std::vector<int>>(iConfig.getParameter<edm::InputTag>("nifnJetsConst"))),
       ifnNetFlavourToken_(
           consumes<std::vector<int> >(iConfig.getParameter<edm::InputTag>("ifnJetNetFlavour"))),
       genJetIFNIndexToken_(
           consumes<std::vector<int> >(iConfig.getParameter<edm::InputTag>("genJetIFNIndex"))),
+      bHadronsToken_(consumes<reco::GenParticleRefVector>(iConfig.getParameter<edm::InputTag>("bHadrons"))),
       strict_(iConfig.getParameter<bool>("strict")),
-      ptMin_(iConfig.getParameter<double>("ptMin")) {
+      ptMin_(iConfig.getParameter<double>("ptMin")),
+      jetR_(iConfig.getParameter<double>("jetR")) {
   usesResource("TFileService");
 
   edm::Service<TFileService> fs;
@@ -168,6 +208,70 @@ IFNFlavourValidator::IFNFlavourValidator(const edm::ParameterSet& iConfig)
   tree_->Branch("IFNJet_partonFlavour", &b_ifnJet_partonFlavour_);
   // Flat vector of length 7 * IFNJet_pt.size(): jet j's netFlavour[k] is at 7*j+k.
   tree_->Branch("IFNJet_netFlavour", &b_ifnJet_netFlavour_);
+  tree_->Branch("bHadron_e", &b_bHadron_e_);
+  tree_->Branch("bHadron_pt", &b_bHadron_pt_);
+  tree_->Branch("bHadron_eta", &b_bHadron_eta_);
+  tree_->Branch("bHadron_phi", &b_bHadron_phi_);
+  tree_->Branch("bHadron_pdgId", &b_bHadron_pdgId_);
+  tree_->Branch("GenJet_bHadronIdx", &b_genJet_bHadronIdx_);
+  tree_->Branch("GenJet_bHadronE", &b_genJet_bHadron_e_);
+  tree_->Branch("IFNJet_bHadronIdx", &b_ifnJet_bHadronIdx_);
+  // Charged daughters of GenJets
+  tree_->Branch("GenJet_chDaughter_pt",    &b_genJet_chDaughter_pt_);
+  tree_->Branch("GenJet_chDaughter_eta",   &b_genJet_chDaughter_eta_);
+  tree_->Branch("GenJet_chDaughter_phi",   &b_genJet_chDaughter_phi_);
+  tree_->Branch("GenJet_chDaughter_mass",  &b_genJet_chDaughter_mass_);
+  // All daughters of IFN jets
+  tree_->Branch("IFNJet_daughter_pt",   &b_ifnJet_daughter_pt_);
+  tree_->Branch("IFNJet_daughter_eta",  &b_ifnJet_daughter_eta_);
+  tree_->Branch("IFNJet_daughter_phi",  &b_ifnJet_daughter_phi_);
+  tree_->Branch("IFNJet_daughter_mass", &b_ifnJet_daughter_mass_);
+}
+
+float IFNFlavourValidator::hasBHadronAncestor(
+    const reco::Candidate& p,
+    const reco::GenParticle& bHadron)
+{
+    std::vector<const reco::Candidate*> stack;
+
+    // start from input particle
+    stack.push_back(&p);
+
+    while (!stack.empty()) {
+        const reco::Candidate* current = stack.back();
+        stack.pop_back();
+
+        if (!current) continue;
+
+        // 🔹 loop over mothers
+        for (size_t i = 0; i < current->numberOfMothers(); ++i) {
+            const reco::Candidate* mom = current->mother(i);
+//            std::cout << "foundding momm " << mom->pdgId() << " " << mom->energy()<< std::endl;
+            if (!mom) continue;
+
+            // 🔑 compare to B hadron
+            if (mom == &bHadron) {
+//            std::cout << "foundding a matching bbbb " <<std::endl;
+                    return p.energy();
+                }
+            stack.push_back(mom);
+        }
+    }
+
+    return 0;
+}
+
+// Returns true if the particle itself or any ancestor (walking the full mother
+// chain) is a b-hadron. B-hadrons are identified by the standard PDG convention:
+// the hundreds digit (mesons: |pdgId|/100 % 10) or the thousands digit
+// (baryons: |pdgId|/1000 % 10) equals 5.
+bool IFNFlavourValidator::isBAncestor(const reco::Candidate& particle) {
+    const int absPdg = std::abs(particle.pdgId());
+    if ((absPdg / 100) % 10 == 5 || (absPdg / 1000) % 10 == 5) return true;
+    for (size_t i = 0; i < particle.numberOfMothers(); ++i) {
+        if (particle.mother(i) && isBAncestor(*particle.mother(i))) return true;
+    }
+    return false;
 }
 
 std::string IFNFlavourValidator::flavourBucket(int signedFlavour) {
@@ -192,7 +296,7 @@ std::string IFNFlavourValidator::flavourBucket(int signedFlavour) {
 }
 
 void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
-  edm::Handle<edm::View<reco::Jet> > genJets;
+  edm::Handle<edm::View<reco::GenJet> > genJets;
   iEvent.getByToken(jetsToken_, genJets);
 
   edm::Handle<reco::JetFlavourInfoMatchingCollection> ghostInfos;
@@ -204,11 +308,29 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
   edm::Handle<reco::BasicJetCollection> ifnJets;
   iEvent.getByToken(ifnJetsToken_, ifnJets);
 
+  edm::Handle<std::vector<double>> ifnJetsConst;
+  iEvent.getByToken(ifnJetsConstToken_, ifnJetsConst);
+
+  edm::Handle<std::vector<double>> ifnJetsConst2;
+  iEvent.getByToken(ifnJetsConstToken2_, ifnJetsConst2);
+
+  edm::Handle<std::vector<double>> ifnJetsConst3;
+  iEvent.getByToken(ifnJetsConstToken3_, ifnJetsConst3);
+
+  edm::Handle<std::vector<double>> ifnJetsConst4;
+  iEvent.getByToken(ifnJetsConstToken4_, ifnJetsConst4);
+
+  edm::Handle<std::vector<int>> nifnJetsConst;
+  iEvent.getByToken(nifnJetsConstToken_, nifnJetsConst);
+
   edm::Handle<std::vector<int> > ifnNet;
   iEvent.getByToken(ifnNetFlavourToken_, ifnNet);
 
   edm::Handle<std::vector<int> > genJetIFNIdx;
   iEvent.getByToken(genJetIFNIndexToken_, genJetIFNIdx);
+
+  edm::Handle<reco::GenParticleRefVector> bHadrons;
+  iEvent.getByToken(bHadronsToken_, bHadrons);
 
   if (ifnNet->size() != 7 * ifnJets->size())
     throw cms::Exception("IFNFlavourValidator")
@@ -276,12 +398,44 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
   b_ifnJet_phi_.clear();
   b_ifnJet_partonFlavour_.clear();
   b_ifnJet_netFlavour_.clear();
+  b_bHadron_e_.clear();
+  b_bHadron_pt_.clear();
+  b_bHadron_eta_.clear();
+  b_bHadron_phi_.clear();
+  b_bHadron_pdgId_.clear();
+  b_genJet_bHadronIdx_.clear();
+  b_genJet_bHadron_e_.clear();
+  b_ifnJet_bHadronIdx_.clear();
+  b_genJet_chDaughter_pt_.clear();
+  b_genJet_chDaughter_eta_.clear();
+  b_genJet_chDaughter_phi_.clear();
+  b_genJet_chDaughter_mass_.clear();
+  b_ifnJet_daughter_pt_.clear();
+  b_ifnJet_daughter_eta_.clear();
+  b_ifnJet_daughter_phi_.clear();
+  b_ifnJet_daughter_mass_.clear();
+
+  // Fill the bHadron collection up front so jet<->bHadron matching can index it.
+  b_bHadron_e_.reserve(bHadrons->size());
+  b_bHadron_pt_.reserve(bHadrons->size());
+  b_bHadron_eta_.reserve(bHadrons->size());
+  b_bHadron_phi_.reserve(bHadrons->size());
+  b_bHadron_pdgId_.reserve(bHadrons->size());
+  for (const auto& bh : *bHadrons) {
+    b_bHadron_e_.push_back(bh->energy());
+    b_bHadron_pt_.push_back(bh->pt());
+    b_bHadron_eta_.push_back(bh->eta());
+    b_bHadron_phi_.push_back(bh->phi());
+    b_bHadron_pdgId_.push_back(bh->pdgId());
+  }
+  const double dR2Max = jetR_ * jetR_;
 
   const bool ghostKeyed = (genJets.id() == ghostInfos->keyProduct().id());
   const bool ifnKeyed = (genJets.id() == ifnInfos->keyProduct().id());
 
   for (size_t i = 0; i < genJets->size(); ++i) {
-    const reco::Jet& j = genJets->at(i);
+    const reco::GenJet& j = genJets->at(i);
+
     const double pt = j.pt();
     const double eta = j.eta();
     const double phi = j.phi();
@@ -340,11 +494,80 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
     b_genJet_hadronFlavour_.push_back(ghostHadron);
     b_genJet_partonFlavourIFN_.push_back(ifnParton);
     b_genJet_ifnJetIdx_.push_back((*genJetIFNIdx)[i]);
+
+    std::vector<int> matched;
+    std::vector<float> matched_e;
+    for (size_t b = 0; b < bHadrons->size(); ++b) {
+      if (reco::deltaR2(eta, phi, b_bHadron_eta_[b], b_bHadron_phi_[b]) < dR2Max*2) {
+      //  std::cout << "checking jet " << pt << std::endl;
+        std::vector<reco::CandidatePtr> const & daughters = j.daughterPtrVector();
+        float energyfromB = 0;
+        const reco::GenParticle& bHadron = *((*bHadrons)[b]);
+       // std::cout << "looking for " << bHadron.pdgId() <<  " " << bHadron.energy()  << " " << bHadron.eta() <<  " " << bHadron.phi()<< std::endl;
+       //i std::cout << "is it " << b_bHadron_eta_[b] <<  " " << b_bHadron_phi_[b] << std::endl;
+        for (const auto &cand : daughters) {
+            energyfromB += hasBHadronAncestor(*cand, bHadron);
+         }
+
+        if (energyfromB > 0) {
+          matched.push_back(static_cast<int>(b));
+          matched_e.push_back(energyfromB/bHadron.energy());
+        }
+      }
+    }
+
+    if (matched.empty()) {
+      matched.push_back(-1);
+      matched_e.push_back(-1);
+    }
+
+    b_genJet_bHadronIdx_.push_back(std::move(matched));
+    b_genJet_bHadron_e_.push_back(std::move(matched_e));
+
+    // Loop over charged daughters:
+    //   - save every one individually in chDaughter_*
+    //   - accumulate those with a b-hadron ancestor into a 4-momentum sum
+    //     stored as a single entry in bChDaughter_* (empty if none)
+    std::vector<float> chPt, chEta, chPhi, chMass;
+    {
+      double sumPx = 0, sumPy = 0, sumPz = 0, sumE = 0;
+      bool hasBDaughter = false;
+      for (size_t d = 0; d < j.numberOfDaughters(); ++d) {
+        const reco::Candidate* dau = j.daughter(d);
+        if (!dau || dau->charge() == 0) continue;
+        // if from a b-hadron ancestor, add to the 4-momentum sum
+        if (isBAncestor(*dau)) {
+          sumPx += dau->px();
+          sumPy += dau->py();
+          sumPz += dau->pz();
+          sumE  += dau->energy();
+          hasBDaughter = true;
+        }
+	else {
+          // every charged daughter saved individually
+          chPt.push_back(dau->px());
+          chEta.push_back(dau->py());
+          chPhi.push_back(dau->pz());
+          chMass.push_back(dau->energy());
+	}
+      }
+      if (hasBDaughter) {
+        chPt.push_back(static_cast<float>(sumPx));
+        chEta.push_back(static_cast<float>(sumPy));
+        chPhi.push_back(static_cast<float>(sumPz));
+        chMass.push_back(sumE);
+      }
+    }
+    b_genJet_chDaughter_pt_.push_back(std::move(chPt));
+    b_genJet_chDaughter_eta_.push_back(std::move(chEta));
+    b_genJet_chDaughter_phi_.push_back(std::move(chPhi));
+    b_genJet_chDaughter_mass_.push_back(std::move(chMass));
   }
 
   // (3) Per IFN-jet loop: eta-phi event display + TTree. The IFN jets and
   //     their netFlavour come straight from the producer's published products.
   for (size_t i = 0; i < ifnJets->size(); ++i) {
+    int nconst = 0;
     const reco::BasicJet& ij = (*ifnJets)[i];
     const double pt = ij.pt();
     const double eta = ij.rapidity();  // matches what the producer uses for matching
@@ -371,6 +594,30 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
     b_ifnJet_partonFlavour_.push_back(reduced);
     for (int k = 0; k < 7; ++k)
       b_ifnJet_netFlavour_.push_back(net[k]);
+
+    std::vector<int> matched;
+    for (size_t b = 0; b < bHadrons->size(); ++b) {
+      if (reco::deltaR2(eta, phi, b_bHadron_eta_[b], b_bHadron_phi_[b]) < dR2Max)
+        matched.push_back(static_cast<int>(b));
+    }
+
+    if (matched.empty()) matched.push_back(-1);
+    b_ifnJet_bHadronIdx_.push_back(std::move(matched));
+
+    // // Save all daughters of this IFN jet
+    std::vector<float> dPt, dEta, dPhi, dMass;
+    // for (size_t d = nconst; d < nconst+nifnJetsConst->at(i); ++d) {
+    //   dPt.push_back(ifnJetsConst->at(d));
+    //   dEta.push_back(ifnJetsConst2->at(d));
+    //   dPhi.push_back(ifnJetsConst3->at(d));
+    //   dMass.push_back(ifnJetsConst4->at(d));
+    // }
+    // b_ifnJet_daughter_pt_.push_back(std::move(dPt));
+    // b_ifnJet_daughter_eta_.push_back(std::move(dEta));
+    // b_ifnJet_daughter_phi_.push_back(std::move(dPhi));
+    // b_ifnJet_daughter_mass_.push_back(std::move(dMass));
+
+    // nconst+=nifnJetsConst->at(i);
   }
 
   tree_->Fill();
@@ -384,11 +631,19 @@ void IFNFlavourValidator::fillDescriptions(edm::ConfigurationDescriptions& descr
   desc.add<edm::InputTag>("ifnFlavourInfos", edm::InputTag("genJetFlavourAssociationIFN"));
   desc.add<edm::InputTag>("ifnJets", edm::InputTag("genJetFlavourAssociationIFN", "ifnJets"))
       ->setComment("BasicJetCollection published by JetFlavourClusteringIFN");
+  desc.add<edm::InputTag>("ifnJetsConst", edm::InputTag("genJetFlavourAssociationIFN", "ifnJetsConst"));
+  desc.add<edm::InputTag>("ifnJetsConst2", edm::InputTag("genJetFlavourAssociationIFN", "ifnJetsConst2"));
+  desc.add<edm::InputTag>("ifnJetsConst3", edm::InputTag("genJetFlavourAssociationIFN", "ifnJetsConst3"));
+  desc.add<edm::InputTag>("ifnJetsConst4", edm::InputTag("genJetFlavourAssociationIFN", "ifnJetsConst4"));
+  desc.add<edm::InputTag>("nifnJetsConst", edm::InputTag("genJetFlavourAssociationIFN", "nifnJetsConst"));
   desc.add<edm::InputTag>("ifnJetNetFlavour", edm::InputTag("genJetFlavourAssociationIFN", "ifnJetNetFlavour"))
       ->setComment("flat vector<int> of length 7 * nIFNJets, parallel to ifnJets");
   desc.add<edm::InputTag>("genJetIFNIndex", edm::InputTag("genJetFlavourAssociationIFN", "genJetIFNIndex"))
       ->setComment("vector<int> parallel to genJets: index of the matched IFN jet, or -1 if no match");
+  desc.add<edm::InputTag>("bHadrons", edm::InputTag("patJetPartons", "bHadrons"))
+      ->setComment("selected b-hadrons (HadronAndPartonSelector:bHadrons)");
   desc.add<double>("ptMin", 10.0)->setComment("min pt for eta-phi map and TTree entries");
+  desc.add<double>("jetR", 0.4)->setComment("jet cone size used for bHadron <-> jet dR matching");
   desc.add<bool>("strict", false);
   descriptions.addDefault(desc);
 }

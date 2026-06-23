@@ -62,12 +62,15 @@ def addIFNFlavour(process, addReco=True, addGen=True, addGenAK8=True, useHadrons
             genParticles = _GP,
             bHadrons = _BHADRONS,
             cHadrons = _CHADRONS,
-            useHadrons = cms.bool(useHadrons),
+            useHadrons = cms.bool(True),#useHadrons),
             jetAlgorithm = cms.string("AntiKt"),
             rParam = cms.double(0.4),
             deltaR = cms.double(0.2),          # match IFN jet to gen jet, R/2
             alpha = cms.double(2.0),
             omega = cms.double(1.0),
+            ptCut = cms.double(5.0),
+            maxRapidity = cms.double(6.0),
+            strict = cms.bool(False),
         )
         newModules.append(process.genJetFlavourAssociationIFN)
 
@@ -78,7 +81,7 @@ def addIFNFlavour(process, addReco=True, addGen=True, addGenAK8=True, useHadrons
             doc = cms.string(_DOC),
             src = genJetTable.src,
             cut = genJetTable.cut,
-            deltaR = cms.double(0.1),
+            deltaR = cms.double(0.2),
             jetFlavourInfos = cms.InputTag("genJetFlavourAssociationIFN"),
         )
         newModules.append(process.genJetFlavourIFNTable)
@@ -119,7 +122,7 @@ def addIFNFlavour(process, addReco=True, addGen=True, addGenAK8=True, useHadrons
             doc = cms.string(_DOC),
             src = genJetAK8Table.src,
             cut = genJetAK8Table.cut,
-            deltaR = cms.double(0.1),
+            deltaR = cms.double(0.4),
             jetFlavourInfos = cms.InputTag("genJetAK8FlavourAssociationIFN"),
         )
         newModules += [process.genJetAK8FlavourAssociationIFN, process.genJetAK8FlavourIFNTable]

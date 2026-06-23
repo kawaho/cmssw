@@ -22,8 +22,10 @@ def addIFNFlavourValidation(process,
                             ifnFlavourInfos=None,
                             ifnJets=None,
                             ifnJetNetFlavour=None,
+                            bHadrons=None,
                             strict=False,
-                            ptMin=10.0):
+                            ptMin=10.0,
+                            jetR=0.4):
     """Wire up the IFNFlavourValidator EDAnalyzer + TFileService.
 
     Defaults target the AK4 gen path that addIFNFlavour() sets up:
@@ -35,7 +37,7 @@ def addIFNFlavourValidation(process,
                          (flat vector<int>, length 7 * nIFNJets;
                           jet j's netFlavour[k] at 7*j + k)
     """
-    from PhysicsTools.NanoAOD.jets_cff import genJetTable
+    from PhysicsTools.NanoAOD.jets_cff import genJetTable, genJetAK8Table
 
     if genJets is None:
         genJets = genJetTable.src                                  # slimmedGenJets
@@ -47,6 +49,8 @@ def addIFNFlavourValidation(process,
         ifnJets = cms.InputTag("genJetFlavourAssociationIFN", "ifnJets")
     if ifnJetNetFlavour is None:
         ifnJetNetFlavour = cms.InputTag("genJetFlavourAssociationIFN", "ifnJetNetFlavour")
+    if bHadrons is None:
+        bHadrons = cms.InputTag("patJetPartons", "bHadrons")
 
     genEvent = cms.InputTag("generator")
 
@@ -62,8 +66,14 @@ def addIFNFlavourValidation(process,
         ifnFlavourInfos = ifnFlavourInfos,
         ifnJets = ifnJets,
         ifnJetNetFlavour = ifnJetNetFlavour,
+        bHadrons = bHadrons,
         strict = cms.bool(False),
         ptMin = cms.double(ptMin),
+        jetR = cms.double(jetR),
+    )
+
+    process.options = cms.untracked.PSet(
+      SkipEvent = cms.untracked.vstring('ProductNotFound')
     )
 
     # The analyzer needs the IFN producer's three products already produced this

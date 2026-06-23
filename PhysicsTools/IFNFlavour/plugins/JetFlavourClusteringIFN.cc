@@ -45,10 +45,21 @@
    - Each TARGET gen jet (e.g. slimmedGenJets) is matched to the nearest IFN jet
      within deltaR (default R/2) and inherits its signed parton flavour.
 
- The output is a reco::JetFlavourInfoMatchingCollection keyed by the target gen
- jets, in which only the parton flavour is set (hadron flavour left at 0). It is
- intended to run in parallel with the stock ghost-based flavour producers so the
- two flavour definitions can be compared per-jet.
+ Outputs (three products, all keyed to this module label):
+   - (default)         reco::JetFlavourInfoMatchingCollection keyed by the target
+                       gen jets, only the parton flavour set (hadron flavour 0).
+   - "ifnJets"         reco::BasicJetCollection with the IFN jets' four-vectors
+                       (BasicJet since reco::Jet is abstract; vertex (0,0,0),
+                       no constituents stored). For downstream consumers (e.g.
+                       the IFN flavour validator) that want the IFN jets without
+                       reclustering them.
+   - "ifnJetNetFlavour" flat std::vector<int> of length 7 * nIFNJets; jet j's
+                       netFlavour[k] is at index 7*j + k. Parallel to "ifnJets".
+   - "genJetIFNIndex"  std::vector<int> of length nGenJets, parallel to the
+                       input gen jets: index of the matched IFN jet (into
+                       "ifnJets"), or -1 if no IFN jet was within deltaR.
+ The default product is intended to run in parallel with the stock ghost-based
+ flavour producers so the two flavour definitions can be compared per-jet.
 
  Reco-jet IFN flavour is obtained downstream by matching reco jets to the gen
  jets (and thus to this collection) by dR -- no reco-level clustering is done.
@@ -73,6 +84,8 @@
 
 #include "DataFormats/JetReco/interface/Jet.h"
 #include "DataFormats/JetReco/interface/JetCollection.h"
+#include "DataFormats/JetReco/interface/BasicJet.h"
+#include "DataFormats/JetReco/interface/BasicJetCollection.h"
 #include "SimDataFormats/JetMatching/interface/JetFlavourInfo.h"
 #include "SimDataFormats/JetMatching/interface/JetFlavourInfoMatching.h"
 #include "DataFormats/Candidate/interface/Candidate.h"
@@ -85,6 +98,8 @@
 
 #include "PhysicsTools/IFNFlavour/interface/IFNFlavourCalculator.h"
 
+#include "fastjet/contrib/FlavInfo.hh"
+
 class JetFlavourClusteringIFN : public edm::stream::EDProducer<> {
 public:
   explicit JetFlavourClusteringIFN(const edm::ParameterSet&);
@@ -94,9 +109,6 @@ public:
 
 private:
   void produce(edm::Event&, const edm::EventSetup&) override;
-
-  // translate IFN net flavour content into a signed parton flavour code
-  static int partonFlavourFromNet(const int netFlavour[7]);
 
   // true if `c` has an ancestor that is a b- (wantB=true) or c-hadron
   static bool hasHeavyAncestor(const reco::Candidate* c, bool wantB);
@@ -108,7 +120,10 @@ private:
   const edm::EDGetTokenT<reco::GenParticleRefVector> cHadronsToken_;
 
   const bool useHadrons_;  // false (default): parton-level flavour; true: hadron-level
+  const bool strict_;
   const std::string jetAlgorithm_;
+  const double ptCut_;
+  const double maxRapidity_;
   const double rParam_;
   const double deltaR_;  // match IFN jets to target gen jets (default R/2)
   const double alpha_;
@@ -121,7 +136,10 @@ JetFlavourClusteringIFN::JetFlavourClusteringIFN(const edm::ParameterSet& iConfi
       bHadronsToken_(consumes<reco::GenParticleRefVector>(iConfig.getParameter<edm::InputTag>("bHadrons"))),
       cHadronsToken_(consumes<reco::GenParticleRefVector>(iConfig.getParameter<edm::InputTag>("cHadrons"))),
       useHadrons_(iConfig.getParameter<bool>("useHadrons")),
+      strict_(iConfig.getParameter<bool>("strict")),
       jetAlgorithm_(iConfig.getParameter<std::string>("jetAlgorithm")),
+      ptCut_(iConfig.getParameter<double>("ptCut")),
+      maxRapidity_(iConfig.getParameter<double>("maxRapidity")),
       rParam_(iConfig.getParameter<double>("rParam")),
       deltaR_(iConfig.exists("deltaR") ? iConfig.getParameter<double>("deltaR") : 0.5 * rParam_),
       alpha_(iConfig.exists("alpha") ? iConfig.getParameter<double>("alpha") : 2.0),
@@ -132,26 +150,22 @@ JetFlavourClusteringIFN::JetFlavourClusteringIFN(const edm::ParameterSet& iConfi
         << "JetFlavourClusteringIFN currently supports only jetAlgorithm=\"AntiKt\", got: " << jetAlgorithm_;
 
   produces<reco::JetFlavourInfoMatchingCollection>();
-}
-
-int JetFlavourClusteringIFN::partonFlavourFromNet(const int netFlavour[7]) {
-  // require EXACTLY one non-zero quark-flavour entry (indices 1..6): return that
-  // flavour, signed (positive net => quark, negative => antiquark). If more than
-  // one is non-zero, return -2 (ambiguous / multi-flavour). If none, fall back to
-  // the wrapper gluon sentinel (netFlavour[0]==21 => gluon, else 0).
-  int found = 0;
-  int flavour = 0;
-  for (int f = 0; f <= 6; ++f) {
-    if (netFlavour[f] != 0) {
-      ++found;
-      if (f==0) { flavour = 21; }
-      else { flavour = (netFlavour[f] > 0 ? f : -f); }
-    }
-  }
-  if (found > 1)
-    return -2;
-  else
-    return flavour;
+  // IFN jets themselves, so downstream consumers don't have to recluster them:
+  //   "ifnJets"          -- reco::BasicJetCollection with the IFN jet four-vectors
+  //                         (reco::Jet is abstract; BasicJet is the lightweight
+  //                          concrete jet type with no constituents stored).
+  //   "ifnJetNetFlavour" -- std::vector<int> of length 7 * ifnJets->size();
+  //                         jet j's netFlavour[k] is at index 7*j + k.
+  produces<reco::BasicJetCollection>("ifnJets");
+  produces<std::vector<double>> ("ifnJetsConst");
+  produces<std::vector<double>> ("ifnJetsConst2");
+  produces<std::vector<double>> ("ifnJetsConst3");
+  produces<std::vector<double>> ("ifnJetsConst4");
+  produces<std::vector<int>> ("nifnJetsConst");
+  produces<std::vector<int> >("ifnJetNetFlavour");
+  // index of the matched IFN jet for each input gen jet (parallel to `jets`);
+  // -1 when no IFN jet lay within deltaR of the gen jet.
+  produces<std::vector<int> >("genJetIFNIndex");
 }
 
 bool JetFlavourClusteringIFN::hasHeavyAncestor(const reco::Candidate* c, bool wantB) {
@@ -196,7 +210,7 @@ void JetFlavourClusteringIFN::produce(edm::Event& iEvent, const edm::EventSetup&
     // PARTON mode: genParticles is the physics-parton collection.
     inputs.reserve(genParticles->size());
     for (edm::View<reco::Candidate>::const_iterator it = genParticles->begin(); it != genParticles->end(); ++it) {
-      if (it->pt() == 0)
+      if ((it->pt() == 0) )//|| (abs(it->y()) > maxRapidity_))
         continue;
       inputs.push_back({it->px(), it->py(), it->pz(), it->energy(), it->pdgId(), true, 0});
     }
@@ -215,20 +229,29 @@ void JetFlavourClusteringIFN::produce(edm::Event& iEvent, const edm::EventSetup&
     //     hadron, inserted below with its real momentum and net b/c flavour).
     for (edm::View<reco::Candidate>::const_iterator it = genParticles->begin(); it != genParticles->end(); ++it) {
       const int absId = std::abs(it->pdgId());
-      if (absId == 12 || absId == 14 || absId == 16)
+      const std::vector<int> numbers = {1000022,
+         1000012, 1000014, 1000016,
+         2000012, 2000014, 2000016,
+         1000039, 5100039,
+         4000012, 4000014, 4000016,
+         9900012, 9900014, 9900016,
+         39, 12, 14, 16};
+
+      if (std::find(numbers.begin(), numbers.end(), absId) != numbers.end()) //(absId == 12 || absId == 14 || absId == 16)
         continue;  // drop neutrinos to match the *NoNu gen jets
-      if (it->pt() == 0)
+      if ((it->et() < 0) || (it->energy() < 0) || (it->pt() < 100 * std::numeric_limits<double>::epsilon()) )//|| (abs(it->y()) > maxRapidity_))
         continue;
       if (hasHeavyAncestor(&*it, /*wantB=*/true) || hasHeavyAncestor(&*it, /*wantB=*/false))
         continue;  // decay product of a b/c hadron -> replaced by the hadron below
-      inputs.push_back({it->px(), it->py(), it->pz(), it->energy(), 0, false, 0});
+      inputs.push_back({it->px(), it->py(), it->pz(), it->energy(), it->charge(), it->pdgId(), false, 0});
+//      std::cout << "adding parts " << it->pt() << " " <<  it->eta() << " " << it->phi() << " " << it->pdgId() <<std::endl;
     }
 
     // (2) b-hadrons: inserted as net-b flavour carriers (real momenta).
     for (reco::GenParticleRefVector::const_iterator it = bHadrons->begin(); it != bHadrons->end(); ++it) {
       if ((*it)->pt() == 0)
         continue;
-      inputs.push_back({(*it)->px(), (*it)->py(), (*it)->pz(), (*it)->energy(), (*it)->pdgId(), true, 5});
+      inputs.push_back({(*it)->px(), (*it)->py(), (*it)->pz(), (*it)->energy(), (*it)->charge(), (*it)->pdgId(), false, 5});
     }
 
     // (3) c-hadrons: inserted as net-c flavour carriers, but ONLY when they do not
@@ -238,33 +261,132 @@ void JetFlavourClusteringIFN::produce(edm::Event& iEvent, const edm::EventSetup&
         continue;
       if (hasHeavyAncestor(&**it, /*wantB=*/true))
         continue;
-      inputs.push_back({(*it)->px(), (*it)->py(), (*it)->pz(), (*it)->energy(), (*it)->pdgId(), true, 4});
+      inputs.push_back({(*it)->px(), (*it)->py(), (*it)->pz(), (*it)->energy(), (*it)->charge(), (*it)->pdgId(), false, 4});
     }
   }
 
   // cluster the parton or hadron-level final state with IFN
   std::vector<ifnflavour::JetFlavour> ifnJets =
-      ifnflavour::clusterIFN(inputs, rParam_, 0.0, alpha_, omega_);
+      ifnflavour::clusterIFN(inputs, rParam_, ptCut_, alpha_, omega_);
+
+  // Publish the IFN jets + their netFlavour so downstream consumers don't have
+  // to recluster. Vertex left at (0,0,0); IFN clustering carries no vertex info.
+  // auto outJets = std::make_unique<reco::BasicJetCollection>();
+  // auto outNet = std::make_unique<std::vector<int> >();
+  // outJets->reserve(ifnJets.size());
+  // outNet->reserve(7 * ifnJets.size());
+  // for (const auto& ij : ifnJets) {
+  //   reco::Particle::LorentzVector p4(ij.px, ij.py, ij.pz, ij.E);
+  //   outJets->emplace_back(p4, reco::Particle::Point(0, 0, 0));
+    
+  //   for (int k = 0; k < 7; ++k)
+  //     outNet->push_back(ij.netFlavour[k]);
+  // }
+
+auto outJets = std::make_unique<reco::BasicJetCollection>();
+auto outNet  = std::make_unique<std::vector<int>>();
+auto jetP4s = std::make_unique<std::vector<double>>();
+auto jetP4s2 = std::make_unique<std::vector<double>>();
+auto jetP4s3 = std::make_unique<std::vector<double>>();
+auto jetP4s4 = std::make_unique<std::vector<double>>();
+auto njetP4s = std::make_unique<std::vector<int>>();
+
+outJets->reserve(ifnJets.size());
+njetP4s->reserve(ifnJets.size());
+outNet->reserve(7 * ifnJets.size());
+
+for (const auto& ij : ifnJets) {
+
+  reco::Particle::LorentzVector p4(ij.px, ij.py, ij.pz, ij.E);
+  outJets->emplace_back(p4, reco::Particle::Point(0, 0, 0));
+  
+
+  int njetsize = 0;
+  for (const auto& pj : ij.constituents) {
+    if (pj.has_user_info<fastjet::contrib::FlavHistory>()) {
+      const auto& flav = pj.user_info<fastjet::contrib::FlavHistory>();
+      if (flav.initial_flavour().charge()!=0) 
+      {
+        jetP4s->push_back(pj.px());
+        jetP4s2->push_back(pj.py());
+        jetP4s3->push_back(pj.pz());
+        jetP4s4->push_back(pj.E());
+        njetsize+=1;
+      }
+
+    }
+  }
+
+  if (njetsize==0) {
+        jetP4s->push_back(0);
+        jetP4s2->push_back(0);
+        jetP4s3->push_back(0);
+        jetP4s4->push_back(0);
+        njetsize+=1;
+  }
+  
+  njetP4s->emplace_back(njetsize);
+
+  // existing net flavour storage
+  for (int k = 0; k < 7; ++k)
+    outNet->push_back(ij.netFlavour[k]);
+}
 
   // match each target gen jet to the nearest IFN jet within deltaR
+  auto outGenIFNIdx = std::make_unique<std::vector<int> >();
+  //std::cout << "there are " << jets->size() << "jets" << std::endl;
+  outGenIFNIdx->reserve(jets->size());
+  //double checkpt = 0;
   for (size_t j = 0; j < jets->size(); ++j) {
-    int partonFlavour = -1;
+
+//  const auto& constituents = jets->at(j).getJetConstituentsQuick();
+//  checkpt = 0;
+//  for (const auto& cand : constituents) {
+////    const reco::Candidate* cand = candPtr->get();
+//    checkpt+=cand->pt();
+//    std::cout << "  Constituent pt: " << cand->pt()
+//              << " eta: " << cand->eta()
+//              << " phi: " << cand->phi()
+//              << " pdgId: " << cand->pdgId()
+//              << std::endl;
+//  }
+//   std::cout << "  jet pt: " << jets->at(j).pt()
+//              << "new pt" << checkpt
+//              << " eta: " << jets->at(j).eta()
+//              << " phi: " << jets->at(j).phi()
+//              << " pdgId: " << jets->at(j).pdgId()
+//              << std::endl;
+//
+
+    int partonFlavour = 10;
+    int bestIdx = -1;
     double bestDR2 = deltaR_ * deltaR_;
-    for (const auto& ij : ifnJets) {
+    for (size_t k = 0; k < ifnJets.size(); ++k) {
+      const auto& ij = ifnJets[k];
       reco::Particle::LorentzVector p4(ij.px, ij.py, ij.pz, ij.E);
       double dr2 = reco::deltaR2(jets->at(j).rapidity(), jets->at(j).phi(), p4.Rapidity(), p4.phi());
       if (dr2 < bestDR2) {
         bestDR2 = dr2;
-        partonFlavour = partonFlavourFromNet(ij.netFlavour);
+        bestIdx = static_cast<int>(k);
+        partonFlavour = ifnflavour::partonFlavourFromNet(ij.netFlavour, strict_);
       }
     }
 
     reco::GenParticleRefVector empty;
     (*jetFlavourInfos)[jets->refAt(j)] =
         reco::JetFlavourInfo(empty, empty, empty, empty, 0, partonFlavour);
+    outGenIFNIdx->push_back(bestIdx);
   }
 
   iEvent.put(std::move(jetFlavourInfos));
+  iEvent.put(std::move(outJets), "ifnJets");
+  iEvent.put(std::move(jetP4s), "ifnJetsConst");
+  iEvent.put(std::move(jetP4s2), "ifnJetsConst2");
+  iEvent.put(std::move(jetP4s3), "ifnJetsConst3");
+  iEvent.put(std::move(jetP4s4), "ifnJetsConst4");
+  iEvent.put(std::move(njetP4s), "nifnJetsConst");
+  iEvent.put(std::move(outNet), "ifnJetNetFlavour");
+  iEvent.put(std::move(outGenIFNIdx), "genJetIFNIndex");
 }
 
 void JetFlavourClusteringIFN::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
@@ -282,6 +404,9 @@ void JetFlavourClusteringIFN::fillDescriptions(edm::ConfigurationDescriptions& d
                    "true            : HADRON-level IFN flavour (b/c hadrons as flavour carriers)");
   desc.add<std::string>("jetAlgorithm", "AntiKt");
   desc.add<double>("rParam");
+  desc.add<double>("ptCut", 5);
+  desc.add<double>("maxRapidity", 6);
+  desc.add<bool>("strict", false);
   desc.add<double>("deltaR", 0.2)->setComment("dR to match IFN jets to target gen jets (default R/2)");
   desc.add<double>("alpha", 2.0);
   desc.add<double>("omega", 1.0);

@@ -11,6 +11,7 @@
 // include only this header.
 
 #include <vector>
+#include "fastjet/PseudoJet.hh"
 
 // The whole library is built with -fvisibility=hidden so the vendored fastjet
 // 3.4.1 symbols stay internal. The wrapper API below must remain callable from
@@ -18,6 +19,9 @@
 #define IFNFLAVOUR_API __attribute__((visibility("default")))
 
 namespace ifnflavour {
+
+  // translate IFN net flavour content into a signed parton flavour code
+  IFNFLAVOUR_API int partonFlavourFromNet(const int netFlavour[7], const bool strict_);
 
   // One input four-vector. If `isFlavourTag` is true the particle is treated as
   // a flavour carrier (its `pdgId` seeds the IFN FlavInfo); otherwise it is an
@@ -31,6 +35,7 @@ namespace ifnflavour {
   // flavour (5 for b-hadrons, 4 for c-hadrons) with its correct net sign.
   struct Particle {
     double px, py, pz, E;
+    int charge;
     int pdgId;          // PDG id; sign matters (quark vs antiquark)
     bool isFlavourTag;  // true => seed IFN flavour from pdgId
     int resetToFlav = 0;  // if >0 (1..6), keep only this flavour after decoding pdgId
@@ -43,6 +48,7 @@ namespace ifnflavour {
   struct JetFlavour {
     double px, py, pz, E;
     int netFlavour[7];  // netFlavour[5] = net b, etc.
+    std::vector<fastjet::PseudoJet> constituents; 
   };
 
   // Cluster `inputs` with the IFN algorithm built on anti-kt(R), and return the

@@ -8,6 +8,7 @@
 <use name="FWCore/Framework"/>
 <use name="FWCore/PluginManager"/>
 <use name="FWCore/ParameterSet"/>
+<use name="FWCore/ServiceRegistry"/>
 <use name="FWCore/Utilities"/>
 <use name="DataFormats/JetReco"/>
 <use name="DataFormats/Candidate"/>
@@ -17,7 +18,12 @@
 <use name="DataFormats/NanoAOD"/>
 <use name="SimDataFormats/JetMatching"/>
 <use name="CommonTools/Utils"/>
+<use name="CommonTools/UtilAlgos"/>
+<use name="root"/>
+<use name="fastjet"/>
+<use name="fastjet/contrib"/>
 
 <library file="*.cc" name="PhysicsToolsIFNFlavourPlugins">
   <flags EDM_PLUGIN="1"/>
+  <flags CXXFLAGS="-I$(LOCALTOP)/src/PhysicsTools/IFNFlavour/fastjet341/include -DDROP_CGAL -fvisibility=hidden -fvisibility-inlines-hidden -w"/>
 </library>

@@ -43,7 +43,7 @@ public:
   /// The flags argument is optional, and can be set either to
   /// FlavInfo::beam or FlavInfo::spectator
   ///
-  FlavInfo (int pdg_code = 0, int flags = 0);
+  FlavInfo (int pdg_code = 0, int charge = 0, int flags = 0);
   /// constructs a flavour info object from the individual flavours
   FlavInfo (int n_d, int n_u, int n_s, int n_c, int n_b, int n_t, int flags = 0);
 
@@ -74,6 +74,8 @@ public:
   /// returns the pdg_code, or 0 if it's unknown (e.g. due to result
   /// of recombination)
   int pdg_code() const {return _pdg_code;}
+
+  int charge() const {return _charge;}
 
   /// label this particle as being an incoming beam particle
   void label_as_beam() {_flav_content[0] |= beam;}
@@ -133,6 +135,7 @@ public:
   static const int _is_flavourless = 1;
 private:
   int _pdg_code;
+  int _charge;
   static const FlavInfo _no_flav;
 
 };

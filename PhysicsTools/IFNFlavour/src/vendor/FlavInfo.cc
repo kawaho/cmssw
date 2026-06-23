@@ -28,7 +28,7 @@ FlavInfo::FlavInfo(int n_d, int n_u, int n_s, int n_c, int n_b, int n_t, int fla
 }
 
 //----------------------------------------------------------------------
-FlavInfo::FlavInfo(int pdg_code, int flags) : _pdg_code(pdg_code){
+FlavInfo::FlavInfo(int pdg_code, int charge, int flags) : _pdg_code(pdg_code), _charge(charge) {
   _flav_content[0] = flags;
   for(unsigned i = 1; i <= 6; i++) _flav_content[i] = 0;
 

@@ -18,6 +18,28 @@ using namespace fastjet::contrib;
 
 namespace ifnflavour {
 
+  int partonFlavourFromNet(const int netFlavour[7], const bool strict_) {
+    // require EXACTLY one non-zero quark-flavour entry (indices 1..6): return that
+    // flavour, signed (positive net => quark, negative => antiquark). If more than
+    // one is non-zero, return -2 (ambiguous / multi-flavour). If none, fall back to
+    // the wrapper gluon sentinel (netFlavour[0]==21 => gluon, else 0).
+    int found = 0;
+    int foundHeavy = 0;
+    int flavour = 0;
+    for (int f = 0; f <= 6; ++f) {
+      if (netFlavour[f] != 0) {
+        ++found;
+        if (f>=4) { ++foundHeavy; }
+        if (f==0) { flavour = 21; }
+        else { flavour = (netFlavour[f] > 0 ? f : -f); }
+      }
+    }
+    if ((foundHeavy > 1) | ((found > 1) & strict_))
+      return 11;
+    else
+      return flavour;
+  }
+
   std::vector<JetFlavour> clusterIFN(const std::vector<Particle>& inputs,
                                      double R,
                                      double ptMin,
@@ -40,9 +62,9 @@ namespace ifnflavour {
       // Every input needs flavour tracking; flavourless inputs get pdg 0.
       // Decode the pdgId into net flavour content via FlavInfo, then (for
       // hadron-level tagging) optionally keep only the requested heavy flavour.
-      FlavInfo flav(p.isFlavourTag ? p.pdgId : 0);
-      if (p.isFlavourTag && p.resetToFlav > 0)
-        flav.reset_all_but_flav(p.resetToFlav);
+      FlavInfo flav(p.pdgId, p.charge); //p.isFlavourTag ? p.pdgId : 0);
+//      if (p.isFlavourTag && p.resetToFlav > 0)
+//        flav.reset_all_but_flav(p.resetToFlav);
       pj.set_user_info(new FlavHistory(flav));
       event.push_back(pj);
     }
@@ -59,10 +81,11 @@ namespace ifnflavour {
       jf.pz = jet.pz();
       jf.E = jet.E();
       const FlavInfo& flav = FlavHistory::current_flavour_of(jet);
-      std::cout << "Jet flavour: " << flav.description() << std::endl;
-      std::cout << "Jet flavour list : " << flav[0] << " " << flav[1] << " " << flav[2] << " " << flav[3] << " " << flav[4] << " " << flav[5] << " " << flav[6] << std::endl;
+      //std::cout << "Jet flavour: " << flav.description() << std::endl;
+      //std::cout << "Jet flavour list : " << flav[0] << " " << flav[1] << " " << flav[2] << " " << flav[3] << " " << flav[4] << " " << flav[5] << " " << flav[6] << std::endl;
       for (int i = 0; i <= 6; ++i)
         jf.netFlavour[i] = flav[i];
+      jf.constituents = jet.constituents();
       out.push_back(jf);
     }
     return out;
