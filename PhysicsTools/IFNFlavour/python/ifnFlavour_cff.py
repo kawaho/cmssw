@@ -74,6 +74,18 @@ def addIFNFlavour(process, addReco=True, addGen=True, addGenAK8=True, useHadrons
         )
         newModules.append(process.genJetFlavourAssociationIFN)
 
+        # Table for the IFN jets themselves (four-momentum + parton flavour).
+        # Standalone NanoAOD collection named "IFNJet".
+        process.ifnJetTable = cms.EDProducer("IFNJetTableProducer",
+            name = cms.string("IFNJet"),
+            doc = cms.string("IFN clustered jets and their parton flavour"),
+            src = cms.InputTag("genJetFlavourAssociationIFN", "ifnJets"),
+            flavour = cms.InputTag("genJetFlavourAssociationIFN", "ifnJetNetFlavourOverall"),
+            genIndex = cms.InputTag("genJetFlavourAssociationIFN", "IFNJetgenIndex"),
+            precision = cms.int32(10),
+        )
+        newModules.append(process.ifnJetTable)
+
     if addGen:
         process.genJetFlavourIFNTable = cms.EDProducer("JetFlavourIFNTableProducer",
             name = cms.string("GenJet"),

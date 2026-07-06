@@ -163,9 +163,11 @@ JetFlavourClusteringIFN::JetFlavourClusteringIFN(const edm::ParameterSet& iConfi
   produces<std::vector<double>> ("ifnJetsConst4");
   produces<std::vector<int>> ("nifnJetsConst");
   produces<std::vector<int> >("ifnJetNetFlavour");
+  produces<std::vector<int> >("ifnJetNetFlavourOverall");
   // index of the matched IFN jet for each input gen jet (parallel to `jets`);
   // -1 when no IFN jet lay within deltaR of the gen jet.
   produces<std::vector<int> >("genJetIFNIndex");
+  produces<std::vector<int> >("IFNJetgenIndex");
 }
 
 bool JetFlavourClusteringIFN::hasHeavyAncestor(const reco::Candidate* c, bool wantB) {
@@ -284,6 +286,7 @@ void JetFlavourClusteringIFN::produce(edm::Event& iEvent, const edm::EventSetup&
 
 auto outJets = std::make_unique<reco::BasicJetCollection>();
 auto outNet  = std::make_unique<std::vector<int>>();
+auto outNetOverall  = std::make_unique<std::vector<int>>();
 auto jetP4s = std::make_unique<std::vector<double>>();
 auto jetP4s2 = std::make_unique<std::vector<double>>();
 auto jetP4s3 = std::make_unique<std::vector<double>>();
@@ -292,6 +295,7 @@ auto njetP4s = std::make_unique<std::vector<int>>();
 
 outJets->reserve(ifnJets.size());
 njetP4s->reserve(ifnJets.size());
+outNetOverall->reserve(ifnJets.size());
 outNet->reserve(7 * ifnJets.size());
 
 for (const auto& ij : ifnJets) {
@@ -330,12 +334,16 @@ for (const auto& ij : ifnJets) {
   // existing net flavour storage
   for (int k = 0; k < 7; ++k)
     outNet->push_back(ij.netFlavour[k]);
+  outNetOverall->push_back( ifnflavour::partonFlavourFromNet(ij.netFlavour, strict_) );
 }
 
   // match each target gen jet to the nearest IFN jet within deltaR
   auto outGenIFNIdx = std::make_unique<std::vector<int> >();
-  //std::cout << "there are " << jets->size() << "jets" << std::endl;
   outGenIFNIdx->reserve(jets->size());
+  // match each target gen jet to the nearest IFN jet within deltaR
+  //
+  auto outIFNGenIdx = std::make_unique<std::vector<int>>(ifnJets.size(), -1);
+  //std::cout << "there are " << jets->size() << "jets" << std::endl;
   //double checkpt = 0;
   for (size_t j = 0; j < jets->size(); ++j) {
 
@@ -360,16 +368,20 @@ for (const auto& ij : ifnJets) {
 
     int partonFlavour = 10;
     int bestIdx = -1;
+    int bestIdxIFN = -1;
     double bestDR2 = deltaR_ * deltaR_;
     for (size_t k = 0; k < ifnJets.size(); ++k) {
       const auto& ij = ifnJets[k];
       reco::Particle::LorentzVector p4(ij.px, ij.py, ij.pz, ij.E);
       double dr2 = reco::deltaR2(jets->at(j).rapidity(), jets->at(j).phi(), p4.Rapidity(), p4.phi());
-      if (dr2 < bestDR2) {
+      if ((dr2 < bestDR2) and (outIFNGenIdx->at(k)==-1)) {
         bestDR2 = dr2;
         bestIdx = static_cast<int>(k);
-        partonFlavour = ifnflavour::partonFlavourFromNet(ij.netFlavour, strict_);
+        partonFlavour = outNetOverall->at(k);
       }
+    }
+    if (bestIdx!=-1) { 
+      if (jets->at(j).pt() >=8) outIFNGenIdx->at(bestIdx) = j;
     }
 
     reco::GenParticleRefVector empty;
@@ -386,7 +398,9 @@ for (const auto& ij : ifnJets) {
   iEvent.put(std::move(jetP4s4), "ifnJetsConst4");
   iEvent.put(std::move(njetP4s), "nifnJetsConst");
   iEvent.put(std::move(outNet), "ifnJetNetFlavour");
+  iEvent.put(std::move(outNetOverall), "ifnJetNetFlavourOverall");
   iEvent.put(std::move(outGenIFNIdx), "genJetIFNIndex");
+  iEvent.put(std::move(outIFNGenIdx), "IFNJetgenIndex");
 }
 
 void JetFlavourClusteringIFN::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
