@@ -236,12 +236,11 @@ void JetFlavourClusteringIFN::produce(edm::Event& iEvent, const edm::EventSetup&
          4000012, 4000014, 4000016,
          9900012, 9900014, 9900016,
          39, 12, 14, 16};
-
       if (std::find(numbers.begin(), numbers.end(), absId) != numbers.end()) //(absId == 12 || absId == 14 || absId == 16)
         continue;  // drop neutrinos to match the *NoNu gen jets
       if ((it->et() < 0) || (it->energy() < 0) || (it->pt() < 100 * std::numeric_limits<double>::epsilon()) )//|| (abs(it->y()) > maxRapidity_))
         continue;
-      if (hasHeavyAncestor(&*it, /*wantB=*/true) || hasHeavyAncestor(&*it, /*wantB=*/false))
+      if (hasHeavyAncestor(&*it, /*wantB=*/true))// || hasHeavyAncestor(&*it, /*wantB=*/false))
         continue;  // decay product of a b/c hadron -> replaced by the hadron below
       inputs.push_back({it->px(), it->py(), it->pz(), it->energy(), it->charge(), it->pdgId(), false, 0});
 //      std::cout << "adding parts " << it->pt() << " " <<  it->eta() << " " << it->phi() << " " << it->pdgId() <<std::endl;
@@ -256,13 +255,13 @@ void JetFlavourClusteringIFN::produce(edm::Event& iEvent, const edm::EventSetup&
 
     // (3) c-hadrons: inserted as net-c flavour carriers, but ONLY when they do not
     //     descend from a b-hadron (b has priority; the b chain already covers them).
-    for (reco::GenParticleRefVector::const_iterator it = cHadrons->begin(); it != cHadrons->end(); ++it) {
-      if ((*it)->pt() == 0)
-        continue;
-      if (hasHeavyAncestor(&**it, /*wantB=*/true))
-        continue;
-      inputs.push_back({(*it)->px(), (*it)->py(), (*it)->pz(), (*it)->energy(), (*it)->charge(), (*it)->pdgId(), false, 4});
-    }
+//    for (reco::GenParticleRefVector::const_iterator it = cHadrons->begin(); it != cHadrons->end(); ++it) {
+//      if ((*it)->pt() == 0)
+//        continue;
+//      if (hasHeavyAncestor(&**it, /*wantB=*/true))
+//        continue;
+//      inputs.push_back({(*it)->px(), (*it)->py(), (*it)->pz(), (*it)->energy(), (*it)->charge(), (*it)->pdgId(), false, 4});
+//    }
   }
 
   // cluster the parton or hadron-level final state with IFN
@@ -300,12 +299,13 @@ for (const auto& ij : ifnJets) {
   reco::Particle::LorentzVector p4(ij.px, ij.py, ij.pz, ij.E);
   outJets->emplace_back(p4, reco::Particle::Point(0, 0, 0));
   
-
   int njetsize = 0;
   for (const auto& pj : ij.constituents) {
     if (pj.has_user_info<fastjet::contrib::FlavHistory>()) {
       const auto& flav = pj.user_info<fastjet::contrib::FlavHistory>();
-      if (flav.initial_flavour().charge()!=0) 
+      auto pdgid = flav.initial_flavour().pdg_code();
+      bool isb = (((int)((abs(pdgid) / 100) % 10) == 5) || ((int)((abs(pdgid) / 1000) % 10) == 5));
+      if ((flav.initial_flavour().charge()!=0) || isb) 
       {
         jetP4s->push_back(pj.px());
         jetP4s2->push_back(pj.py());

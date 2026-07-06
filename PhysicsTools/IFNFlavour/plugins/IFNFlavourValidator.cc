@@ -122,6 +122,7 @@ private:
   const edm::EDGetTokenT<std::vector<int> > ifnNetFlavourToken_;
   const edm::EDGetTokenT<std::vector<int> > genJetIFNIndexToken_;
   const edm::EDGetTokenT<reco::GenParticleRefVector> bHadronsToken_;
+  const edm::EDGetTokenT<edm::View<reco::Candidate> > genParticlesToken_;
 
   const bool strict_;
   const double ptMin_;   // minimum pt for TTree/etaphi entries (composition uses all)
@@ -159,6 +160,9 @@ private:
   std::vector<std::vector<float>> b_genJet_chDaughter_eta_;
   std::vector<std::vector<float>> b_genJet_chDaughter_phi_;
   std::vector<std::vector<float>> b_genJet_chDaughter_mass_;
+  std::vector<std::vector<int>> b_genJet_chDaughter_ch_;
+  std::vector<std::vector<int>> b_genJet_chDaughter_B_;
+  std::vector<std::vector<int>> b_genJet_chDaughter_pdgid_;
   // All daughters of IFN jets (one entry per daughter)
   std::vector<std::vector<float>> b_ifnJet_daughter_pt_;
   std::vector<std::vector<float>> b_ifnJet_daughter_eta_;
@@ -169,6 +173,7 @@ private:
 IFNFlavourValidator::IFNFlavourValidator(const edm::ParameterSet& iConfig)
     : genTag_(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("generator"))),
       jetsToken_(consumes<edm::View<reco::GenJet> >(iConfig.getParameter<edm::InputTag>("genJets"))),
+      genParticlesToken_(consumes<edm::View<reco::Candidate> >(iConfig.getParameter<edm::InputTag>("genParticles"))),
       ghostInfosToken_(
           consumes<reco::JetFlavourInfoMatchingCollection>(iConfig.getParameter<edm::InputTag>("ghostFlavourInfos"))),
       ifnInfosToken_(
@@ -221,6 +226,9 @@ IFNFlavourValidator::IFNFlavourValidator(const edm::ParameterSet& iConfig)
   tree_->Branch("GenJet_chDaughter_eta",   &b_genJet_chDaughter_eta_);
   tree_->Branch("GenJet_chDaughter_phi",   &b_genJet_chDaughter_phi_);
   tree_->Branch("GenJet_chDaughter_mass",  &b_genJet_chDaughter_mass_);
+  tree_->Branch("GenJet_chDaughter_ch",    &b_genJet_chDaughter_ch_);
+  tree_->Branch("GenJet_chDaughter_B",   &b_genJet_chDaughter_B_);
+  tree_->Branch("GenJet_chDaughter_pdgid",   &b_genJet_chDaughter_pdgid_);
   // All daughters of IFN jets
   tree_->Branch("IFNJet_daughter_pt",   &b_ifnJet_daughter_pt_);
   tree_->Branch("IFNJet_daughter_eta",  &b_ifnJet_daughter_eta_);
@@ -243,17 +251,13 @@ float IFNFlavourValidator::hasBHadronAncestor(
 
         if (!current) continue;
 
-        // 🔹 loop over mothers
         for (size_t i = 0; i < current->numberOfMothers(); ++i) {
             const reco::Candidate* mom = current->mother(i);
-//            std::cout << "foundding momm " << mom->pdgId() << " " << mom->energy()<< std::endl;
             if (!mom) continue;
 
-            // 🔑 compare to B hadron
             if (mom == &bHadron) {
-//            std::cout << "foundding a matching bbbb " <<std::endl;
-                    return p.energy();
-                }
+              return p.energy();
+            }
             stack.push_back(mom);
         }
     }
@@ -384,6 +388,10 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
 
   edm::Handle<GenEventInfoProduct> genInfo;
   iEvent.getByToken(genTag_, genInfo);
+
+  edm::Handle<edm::View<reco::Candidate> > genParticles;
+  iEvent.getByToken(genParticlesToken_, genParticles);
+
   weight = genInfo->weight();
 
   b_genJet_pt_.clear();
@@ -410,6 +418,9 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
   b_genJet_chDaughter_eta_.clear();
   b_genJet_chDaughter_phi_.clear();
   b_genJet_chDaughter_mass_.clear();
+  b_genJet_chDaughter_ch_.clear();
+  b_genJet_chDaughter_B_.clear();
+  b_genJet_chDaughter_pdgid_.clear();
   b_ifnJet_daughter_pt_.clear();
   b_ifnJet_daughter_eta_.clear();
   b_ifnJet_daughter_phi_.clear();
@@ -497,22 +508,36 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
 
     std::vector<int> matched;
     std::vector<float> matched_e;
-    for (size_t b = 0; b < bHadrons->size(); ++b) {
-      if (reco::deltaR2(eta, phi, b_bHadron_eta_[b], b_bHadron_phi_[b]) < dR2Max*2) {
-      //  std::cout << "checking jet " << pt << std::endl;
-        std::vector<reco::CandidatePtr> const & daughters = j.daughterPtrVector();
-        float energyfromB = 0;
-        const reco::GenParticle& bHadron = *((*bHadrons)[b]);
-       // std::cout << "looking for " << bHadron.pdgId() <<  " " << bHadron.energy()  << " " << bHadron.eta() <<  " " << bHadron.phi()<< std::endl;
-       //i std::cout << "is it " << b_bHadron_eta_[b] <<  " " << b_bHadron_phi_[b] << std::endl;
-        for (const auto &cand : daughters) {
-            energyfromB += hasBHadronAncestor(*cand, bHadron);
-         }
 
-        if (energyfromB > 0) {
-          matched.push_back(static_cast<int>(b));
-          matched_e.push_back(energyfromB/bHadron.energy());
-        }
+    std::vector<float> chPt, chEta, chPhi, chMass;
+    std::vector<int> chCh, chPdgid, chB;
+
+//      if (true) { //reco::deltaR2(eta, phi, b_bHadron_eta_[b], b_bHadron_phi_[b]) < dR2Max*2) {
+    std::vector<reco::CandidatePtr> const & daughters = j.daughterPtrVector();
+    for (size_t b = 0; b < bHadrons->size(); ++b) {
+      float energyfromB = 0;
+      const reco::GenParticle& bHadron = *((*bHadrons)[b]);
+      for (size_t ic = 0; ic < daughters.size(); ++ic) {
+          const auto &cand = daughters[ic];
+          float energyfromBCand = hasBHadronAncestor(*cand, bHadron);
+          energyfromB += energyfromBCand;
+          if (b==0) {
+            chPt.push_back((*cand).px());
+            chEta.push_back((*cand).py());
+            chPhi.push_back((*cand).pz());
+            chMass.push_back((*cand).energy());
+            chPdgid.push_back((*cand).pdgId());
+            chCh.push_back((*cand).charge());
+            chB.push_back(energyfromBCand > 0 ? 0 : -1);
+          }
+          else {
+            if (energyfromBCand > 0) chB[ic] = b;
+          }
+       }
+
+      if (energyfromB > 0) {
+        matched.push_back(static_cast<int>(b));
+        matched_e.push_back(energyfromB/bHadron.energy());
       }
     }
 
@@ -521,53 +546,40 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
       matched_e.push_back(-1);
     }
 
+    for (edm::View<reco::Candidate>::const_iterator it = genParticles->begin(); it != genParticles->end(); ++it) {
+      const int absId = std::abs(it->pdgId());
+      if (!(absId==12 || absId==14 || absId==16)) continue;
+      if (reco::deltaR2(eta, phi, it->eta(), it->phi()) < dR2Max) {
+        float fromb = -1;
+        for (size_t b = 0; b < bHadrons->size(); ++b) {
+           if (hasBHadronAncestor(*it, *((*bHadrons)[b])) > 0) fromb = b;
+        }
+        chPt.push_back(it->px());
+        chEta.push_back(it->py());
+        chPhi.push_back(it->pz());
+        chMass.push_back(it->energy());
+        chPdgid.push_back(it->pdgId());
+        chCh.push_back(it->charge());
+        chB.push_back(fromb);
+      }
+    }
+
     b_genJet_bHadronIdx_.push_back(std::move(matched));
     b_genJet_bHadron_e_.push_back(std::move(matched_e));
 
-    // Loop over charged daughters:
-    //   - save every one individually in chDaughter_*
-    //   - accumulate those with a b-hadron ancestor into a 4-momentum sum
-    //     stored as a single entry in bChDaughter_* (empty if none)
-    std::vector<float> chPt, chEta, chPhi, chMass;
-    {
-      double sumPx = 0, sumPy = 0, sumPz = 0, sumE = 0;
-      bool hasBDaughter = false;
-      for (size_t d = 0; d < j.numberOfDaughters(); ++d) {
-        const reco::Candidate* dau = j.daughter(d);
-        if (!dau || dau->charge() == 0) continue;
-        // if from a b-hadron ancestor, add to the 4-momentum sum
-        if (isBAncestor(*dau)) {
-          sumPx += dau->px();
-          sumPy += dau->py();
-          sumPz += dau->pz();
-          sumE  += dau->energy();
-          hasBDaughter = true;
-        }
-	else {
-          // every charged daughter saved individually
-          chPt.push_back(dau->px());
-          chEta.push_back(dau->py());
-          chPhi.push_back(dau->pz());
-          chMass.push_back(dau->energy());
-	}
-      }
-      if (hasBDaughter) {
-        chPt.push_back(static_cast<float>(sumPx));
-        chEta.push_back(static_cast<float>(sumPy));
-        chPhi.push_back(static_cast<float>(sumPz));
-        chMass.push_back(sumE);
-      }
-    }
     b_genJet_chDaughter_pt_.push_back(std::move(chPt));
     b_genJet_chDaughter_eta_.push_back(std::move(chEta));
     b_genJet_chDaughter_phi_.push_back(std::move(chPhi));
     b_genJet_chDaughter_mass_.push_back(std::move(chMass));
+    b_genJet_chDaughter_ch_.push_back(std::move(chCh));
+    b_genJet_chDaughter_B_.push_back(std::move(chB));
+    b_genJet_chDaughter_pdgid_.push_back(std::move(chPdgid));
   }
 
   // (3) Per IFN-jet loop: eta-phi event display + TTree. The IFN jets and
   //     their netFlavour come straight from the producer's published products.
+  int nconst = 0;
   for (size_t i = 0; i < ifnJets->size(); ++i) {
-    int nconst = 0;
     const reco::BasicJet& ij = (*ifnJets)[i];
     const double pt = ij.pt();
     const double eta = ij.rapidity();  // matches what the producer uses for matching
@@ -606,18 +618,18 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
 
     // // Save all daughters of this IFN jet
     std::vector<float> dPt, dEta, dPhi, dMass;
-    // for (size_t d = nconst; d < nconst+nifnJetsConst->at(i); ++d) {
-    //   dPt.push_back(ifnJetsConst->at(d));
-    //   dEta.push_back(ifnJetsConst2->at(d));
-    //   dPhi.push_back(ifnJetsConst3->at(d));
-    //   dMass.push_back(ifnJetsConst4->at(d));
-    // }
-    // b_ifnJet_daughter_pt_.push_back(std::move(dPt));
-    // b_ifnJet_daughter_eta_.push_back(std::move(dEta));
-    // b_ifnJet_daughter_phi_.push_back(std::move(dPhi));
-    // b_ifnJet_daughter_mass_.push_back(std::move(dMass));
+     for (size_t d = nconst; d < nconst+nifnJetsConst->at(i); ++d) {
+       dPt.push_back(ifnJetsConst->at(d));
+       dEta.push_back(ifnJetsConst2->at(d));
+       dPhi.push_back(ifnJetsConst3->at(d));
+       dMass.push_back(ifnJetsConst4->at(d));
+     }
+     b_ifnJet_daughter_pt_.push_back(std::move(dPt));
+     b_ifnJet_daughter_eta_.push_back(std::move(dEta));
+     b_ifnJet_daughter_phi_.push_back(std::move(dPhi));
+     b_ifnJet_daughter_mass_.push_back(std::move(dMass));
 
-    // nconst+=nifnJetsConst->at(i);
+    nconst+=nifnJetsConst->at(i);
   }
 
   tree_->Fill();
@@ -645,6 +657,7 @@ void IFNFlavourValidator::fillDescriptions(edm::ConfigurationDescriptions& descr
   desc.add<double>("ptMin", 10.0)->setComment("min pt for eta-phi map and TTree entries");
   desc.add<double>("jetR", 0.4)->setComment("jet cone size used for bHadron <-> jet dR matching");
   desc.add<bool>("strict", false);
+  desc.add<edm::InputTag>("genParticles", edm::InputTag("packedGenParticles"));
   descriptions.addDefault(desc);
 }
 
