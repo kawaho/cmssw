@@ -252,7 +252,16 @@ float IFNFlavourValidator::hasBHadronAncestor(
         if (!current) continue;
 
         for (size_t i = 0; i < current->numberOfMothers(); ++i) {
-            const reco::Candidate* mom = current->mother(i);
+            // mother(i) resolves an edm::Ref into prunedGenParticles. If MiniAOD
+            // pruning dropped that ancestor the ref carries an invalid ProductID
+            // and the deref throws (ProductNotFound / "InvalidID"). Treat such a
+            // broken link as "no further ancestry along this branch".
+            const reco::Candidate* mom = nullptr;
+            try {
+                mom = current->mother(i);
+            } catch (const cms::Exception&) {
+                continue;
+            }
             if (!mom) continue;
 
             if (mom == &bHadron) {
@@ -516,18 +525,34 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
     std::vector<reco::CandidatePtr> const & daughters = j.daughterPtrVector();
     for (size_t b = 0; b < bHadrons->size(); ++b) {
       float energyfromB = 0;
-      const reco::GenParticle& bHadron = *((*bHadrons)[b]);
+      // Skip b-hadron refs that don't resolve (invalid ProductID).
+      const auto& bHadronRef = (*bHadrons)[b];
+      if (!bHadronRef.isNonnull() || !bHadronRef.isAvailable()) continue;
+      const reco::GenParticle& bHadron = *bHadronRef;
       for (size_t ic = 0; ic < daughters.size(); ++ic) {
           const auto &cand = daughters[ic];
-          float energyfromBCand = hasBHadronAncestor(*cand, bHadron);
+          // A constituent Ptr with an invalid/dropped ProductID would throw on
+          // deref; treat it as contributing no b-energy and keep the per-jet
+          // vectors index-aligned by pushing a placeholder row (b==0 only).
+          const bool candOk = cand.isNonnull() && cand.isAvailable();
+          float energyfromBCand = candOk ? hasBHadronAncestor(*cand, bHadron) : 0.f;
           energyfromB += energyfromBCand;
           if (b==0) {
-            chPt.push_back((*cand).px());
-            chEta.push_back((*cand).py());
-            chPhi.push_back((*cand).pz());
-            chMass.push_back((*cand).energy());
-            chPdgid.push_back((*cand).pdgId());
-            chCh.push_back((*cand).charge());
+            if (candOk) {
+              chPt.push_back((*cand).px());
+              chEta.push_back((*cand).py());
+              chPhi.push_back((*cand).pz());
+              chMass.push_back((*cand).energy());
+              chPdgid.push_back((*cand).pdgId());
+              chCh.push_back((*cand).charge());
+            } else {
+              chPt.push_back(0.f);
+              chEta.push_back(0.f);
+              chPhi.push_back(0.f);
+              chMass.push_back(0.f);
+              chPdgid.push_back(0);
+              chCh.push_back(0);
+            }
             chB.push_back(energyfromBCand > 0 ? 0 : -1);
           }
           else {
@@ -552,7 +577,9 @@ void IFNFlavourValidator::analyze(const edm::Event& iEvent, const edm::EventSetu
       if (reco::deltaR2(eta, phi, it->eta(), it->phi()) < dR2Max) {
         float fromb = -1;
         for (size_t b = 0; b < bHadrons->size(); ++b) {
-           if (hasBHadronAncestor(*it, *((*bHadrons)[b])) > 0) fromb = b;
+           const auto& bHadronRef = (*bHadrons)[b];
+           if (!bHadronRef.isNonnull() || !bHadronRef.isAvailable()) continue;
+           if (hasBHadronAncestor(*it, *bHadronRef) > 0) fromb = b;
         }
         chPt.push_back(it->px());
         chEta.push_back(it->py());
@@ -656,7 +683,7 @@ void IFNFlavourValidator::fillDescriptions(edm::ConfigurationDescriptions& descr
       ->setComment("selected b-hadrons (HadronAndPartonSelector:bHadrons)");
   desc.add<double>("ptMin", 10.0)->setComment("min pt for eta-phi map and TTree entries");
   desc.add<double>("jetR", 0.4)->setComment("jet cone size used for bHadron <-> jet dR matching");
-  desc.add<bool>("strict", false);
+  desc.add<bool>("strict", true);
   desc.add<edm::InputTag>("genParticles", edm::InputTag("packedGenParticles"));
   descriptions.addDefault(desc);
 }

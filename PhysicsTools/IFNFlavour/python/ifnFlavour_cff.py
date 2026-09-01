@@ -70,7 +70,7 @@ def addIFNFlavour(process, addReco=True, addGen=True, addGenAK8=True, useHadrons
             omega = cms.double(1.0),
             ptCut = cms.double(5.0),
             maxRapidity = cms.double(6.0),
-            strict = cms.bool(False),
+            strict = cms.bool(True),
         )
         newModules.append(process.genJetFlavourAssociationIFN)
 

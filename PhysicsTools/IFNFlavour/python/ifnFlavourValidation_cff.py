@@ -23,7 +23,7 @@ def addIFNFlavourValidation(process,
                             ifnJets=None,
                             ifnJetNetFlavour=None,
                             bHadrons=None,
-                            strict=False,
+                            strict=True,
                             ptMin=10.0,
                             jetR=0.4):
     """Wire up the IFNFlavourValidator EDAnalyzer + TFileService.
@@ -67,7 +67,7 @@ def addIFNFlavourValidation(process,
         ifnJets = ifnJets,
         ifnJetNetFlavour = ifnJetNetFlavour,
         bHadrons = bHadrons,
-        strict = cms.bool(False),
+        strict = cms.bool(True),
         ptMin = cms.double(ptMin),
         jetR = cms.double(jetR),
     )

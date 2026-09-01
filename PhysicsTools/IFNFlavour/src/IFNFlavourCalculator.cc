@@ -28,14 +28,21 @@ namespace ifnflavour {
     int flavour = 0;
     for (int f = 0; f <= 6; ++f) {
       if (netFlavour[f] != 0) {
-        ++found;
-        if (f>=4) { ++foundHeavy; }
+//        ++found;
+        if (f>=4) { 
+          ++foundHeavy; 
+        }
+        else {
+          ++found;
+        }
         if (f==0) { flavour = 21; }
         else { flavour = (netFlavour[f] > 0 ? f : -f); }
       }
     }
-    if ((foundHeavy > 1) | ((found > 1) & strict_))
+    if (foundHeavy > 1)
       return 11;
+    else if ((found > 1) & strict_ & (foundHeavy==0)) 
+      return 12;
     else
       return flavour;
   }
